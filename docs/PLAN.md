@@ -52,6 +52,9 @@ section registry, `update.sh`), same as SLQ Hub and FamilyLog.
 - The Docker image and `proxmox/create-lxc.sh` have never run: no Docker daemon and no
   Proxmox where this was built. `tools/container.py` is FamilyLog's, renamed.
 - Real Google OAuth. The whole flow ran against `tools/mock_upstreams.py` only.
+- SLQ DL's dates were read from the linked pages, not checked against a second
+  source one by one. One is inferred: NBC naming Leno, 6 June 1991. The source says
+  "two weeks later" than 23 May and cites a New York Times article of 7 June.
 
 ## Open
 
