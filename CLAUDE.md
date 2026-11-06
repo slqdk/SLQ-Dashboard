@@ -21,6 +21,9 @@ Proxmox LXC. **Read `docs/PLAN.md` first: decisions, what is built, what is open
 - **Google is read only.** One scope, `calendar.readonly`. Nothing writes to Google.
 - **FamilyLog is read only.** `sections/familylog/client.py` only ever uses GET;
   a test parses the file to hold it to that.
+- **dk-live's map only reads, and only its map.** It passes through
+  `/api/s/dklive/map`, where `MAP_FEEDS` decides what gets through: dk-live trusts its
+  home network, so its settings and log must stay out of reach.
 - **Printers are read only.** `sections/printers/watcher.py` publishes one thing,
   `pushall`, and at most every five minutes; a test parses the file to hold it to that.
 - **Camera logins stay in memory.** Streams go to go2rtc with PATCH, never PUT, which
@@ -37,7 +40,7 @@ Proxmox LXC. **Read `docs/PLAN.md` first: decisions, what is built, what is open
   `settings.public()`; per-person tokens through `core/vault.py`.
 - **Nordnet rows are a person's own.** Nothing from them reaches a log or an error
   text, only the last four digits of a depot number are kept, and real exports stay
-  out of the repo and its tests.
+  out of the repo and its tests. Only ISINs go to Yahoo.
 - **No ads, images or trackers from news feeds.** Plain text only, paid items dropped.
 - Every SLQ DL fact in `seed.json` has a source. Don't add one from memory.
 - Migrations only add; never renumber one that has run.

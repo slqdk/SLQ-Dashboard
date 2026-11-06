@@ -7,11 +7,14 @@ Last updated 2026-11-06. Read this before changing anything.
 | Topic | Decision |
 |---|---|
 | Shape | An overview page with info from all sections, then a page per section |
+| Overview, from 2026-11-06 | Date to the far left, clock to the far right, Dagsbåndet between them. dk-live's map in the middle. News, stocks and F1 fixed to the bottom. No Kalender or DK live blocks: the band carries the calendar, the map carries DK live |
+| The map | dk-live's own map, only things from the last 6 hours, with a toggle for each of its layers under Admin → Opsætning → DK live |
+| Aktier | A weekly graph of what he holds |
 | Target | Desktop PCs. Phones only have to work |
 | Platform | A new system of its own, in its own Proxmox container |
 | FamilyLog | The new system reads FamilyLog through an API. It can search, never post |
 | F1 | Only the calendar of coming practice, qualifying and race. Nothing live |
-| DK live | Live on the overview: power prices, traffic and updates |
+| DK live | Live on the overview: power prices in the band, the rest on the map |
 | LogMyLife | Was never really built, so it is developed here |
 | LogMyLife remembers | One calendar, entries from other sections, own entries. Changed on 2026-11-06: at first all calendars, now only the main one, which is Google's primary until the person picks another |
 | LogMyLife ↔ Google | Google to the log only. Nothing is written to Google |
@@ -39,7 +42,7 @@ section registry, `update.sh`), same as SLQ Hub and FamilyLog.
 
 | Section | State |
 |---|---|
-| Overview | Works. Date, clock, a sentence built from the data, Dagsbåndet, a block per section |
+| Overview | Works. Date, clock, a sentence built from the data, Dagsbåndet on top, dk-live's map in the middle with blocks either side, news, stocks and F1 at the bottom. Fits the window from 880 px high; below that the page scrolls |
 | Ping indicator | Works. Browser → server round trip, page load; server → Cloudflare, Google, dk-live, FamilyLog by TCP connect; load average |
 | Admin | Works. Users, roles, sections per user, passwords, sign out, setup of everything, lists of printers and cameras |
 | Kalender | Works, run against real Google. Every ticked calendar in Google's colours, the main one also goes to LogMyLife |
@@ -52,7 +55,7 @@ section registry, `update.sh`), same as SLQ Hub and FamilyLog.
 | FamilyLog | Works, run against a real FamilyLog on its `read-keys` branch. Month's spending, search, Dagbog and FamilyMap into LogMyLife |
 | Printere | Built. One MQTT connection per printer, read only. Run against `tools/mock_printer.py`, never a real printer |
 | Kameraer | Built. Pictures every 5 seconds, live video in H.264 through the login, go2rtc behind it. Run in Chrome against real go2rtc and an RTSP test source, never a real C200 |
-| Aktier | Works from Nordnet's CSV export, run on a real one: holdings, average cost, dividends and results per year. No market prices yet. See Nordnet below |
+| Aktier | Works from Nordnet's CSV export, run on a real one: holdings, average cost, dividends and results per year, and the week as one line for all holdings with a sparkline for each. Prices from Yahoo, run on the real holdings: 10 of 11 found |
 
 ### How Printere and Kameraer work
 - **Printere:** TLS on 8883, user `bblp`, the LAN access code as password. Models
@@ -78,6 +81,8 @@ section registry, `update.sh`), same as SLQ Hub and FamilyLog.
   logo would mean verification. The API answers in Google's classic palette, so
   `core/google.py` maps to the modern one. Someone who chose classic in Google's own
   settings sees other shades than here.
+- The dk-live map: the branch ran in Chrome through the dashboard against real feeds, but
+  dk-live's own Docker build has not. The layout was checked at 1920 × 1000.
 - Real Bambu printers. Field names and the 5-minute rule are from OpenBambuAPI. Firmware
   since early 2025 restricts third-party control; monitoring is reported to work, and
   some setups may need LAN mode or Developer Mode.
@@ -94,19 +99,29 @@ section registry, `update.sh`), same as SLQ Hub and FamilyLog.
 ## Open
 
 ### Waiting for a merge (needs Søren)
-No PRs could be opened from where this was built, so both are pushed as branches:
-- **FamilyLog `read-keys`** (0.5.0): read keys, `flk_...`, GET only, an allowlist of paths.
-  The dashboard's FamilyLog section needs it.
-- **dk-live `fix/power-price-time`**: dk-live read `TimeDK` as UTC, which put every
-  price 1 to 2 hours late. The dashboard corrects for it until this is merged
-  (`price_time` in `sections/dklive/client.py`) and honours `timeBase: "utc"` after.
+No PRs could be opened from where this was built, so it is pushed as a branch:
+- **dk-live `embed-map`**: `?embed=1&hours=6&layers=...` hides the menus, fetches only the
+  named layers and leaves out what is older than `hours`, and every address in the client
+  is relative. Without it the overview's map has no data, because the client asks for
+  `/api/...` at the dashboard's root.
+
+### How the map gets to the overview
+An iframe of `/api/s/dklive/map/index.html`, which the dashboard passes through to dk-live.
+Same address means https stays https, with no mixed content, and the map stays behind the
+login. It also means nothing new has to be opened to the outside. dk-live trusts its home
+network and the dashboard is on it, so only the paths in `MAP_FEEDS` get through: not its
+settings and not its log. A test holds it to that.
+
+Time limits: alarms and lightning by their time, traffic by when it last changed, Autobahn
+and navigation warnings by their start. Things with a position right now (planes, ships,
+trains) and things that are simply there (webcams, airports) are not filtered.
 
 ### Strava API (needs Søren)
 The export needs no subscription and works now. The API has needed a paid Strava
 subscription since June 2026. If he has one: `activity:read_all`, and entries must stay
 that person's own (Strava's Section 2.3) and never go to any AI (5.3).
 
-### Nordnet: prices (needs a decision)
+### Nordnet and prices
 The API stays closed: Nordnet's docs say it is not onboarding new customers, its FAQ
 offers a waiting list and lists a price from 1,290 SEK a month, and Søren has no key.
 A key also gives full trading access, with no read-only mode. So the way in is the
@@ -120,15 +135,18 @@ included. Fractions are rounded, so totals are compared with a tolerance of 0.00
 The cost is `Indkøbsværdi`, which excludes fees on most purchases, so it should match
 Nordnet's own average price, not what left the account.
 
-Holdings are as fresh as the last import, and market value needs a separate price
-source. Unofficial web-session routes (nordpy, nordnet-mcp, with MitID or QR login) give
-real-time holdings but need a person to log in again. Not recommended.
+Prices come from Yahoo Finance (`aktier/prices.py`): no key, but not an official API, so
+it can stop working. The last prices stay in the database. Only ISINs are sent. Most of
+what Søren holds is funds, with one price a day, so the day is the resolution, and they
+are asked for by the hour because Yahoo's daily series is nearly empty for some ETFs.
+One of his 11 holdings is unknown to Yahoo and shows as "uden kurs". Holdings are as
+fresh as the last import.
 
 ### Next, roughly in order
 1. Finish the deploy on CT 109, then the real Google connect
 2. Merge the two branches above and set the FamilyLog keys
 3. Add the real printers and cameras in Admin, and fix what they turn up
-4. A price source for Aktier, so holdings get a market value
+4. Whatever real use of the new overview turns up
 5. Photos on LogMyLife entries (FamilyLog's `_process`: resized, EXIF stripped)
 6. More SLQ DL facts, above all the 90s story and guests
 7. Bookmark import for Links

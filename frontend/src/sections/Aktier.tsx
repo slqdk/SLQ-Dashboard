@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { api } from '../core/api'
-import { fullDate, kr, localDate, units } from '../core/format'
+import { fullDate, kr, localDate, signed, units, whole } from '../core/format'
+import type { StockWeek as Week } from '../core/types'
 import { usePoll } from '../core/usePoll'
 import { Dialog, FileImport, SectionHead } from './common'
+import { StockWeek } from './StockWeek'
 
 const API = '/api/s/aktier'
 
@@ -30,10 +32,12 @@ interface State {
   importedAt: string | null
   positions: Position[]
   years: Year[]
+  week: Week | null
 }
 
-function Holdings({ positions }: { positions: Position[] }) {
+function Holdings({ positions, week }: { positions: Position[]; week: Week | null }) {
   const depots = new Set(positions.map((p) => p.depot)).size > 1
+  const priced = new Map(week?.items.map((i) => [i.isin, i]))
   return (
     <div className="table-wrap">
       <table className="holdings">
@@ -44,18 +48,25 @@ function Holdings({ positions }: { positions: Position[] }) {
             <th scope="col">Antal</th>
             <th scope="col">Snitkurs</th>
             <th scope="col">Købsværdi</th>
+            <th scope="col">Værdi</th>
+            <th scope="col">Uge</th>
           </tr>
         </thead>
         <tbody>
-          {positions.map((p) => (
+          {positions.map((p) => {
+            const now = priced.get(p.isin)
+            return (
             <tr key={`${p.depot}${p.isin}`}>
               <th scope="row">{p.name}</th>
               {depots && <td>…{p.depot}</td>}
               <td>{units(p.quantity)}</td>
               <td>{p.cost == null ? 'Ukendt' : kr(p.cost / p.quantity)}</td>
               <td>{p.cost == null ? 'Ukendt' : `${kr(p.cost)} ${p.currency}`}</td>
+              <td>{now ? `${whole(now.value)} kr` : 'Ingen kurs'}</td>
+              <td>{now ? `${signed(now.change)} %` : ''}</td>
             </tr>
-          ))}
+            )
+          })}
         </tbody>
       </table>
     </div>
@@ -84,7 +95,8 @@ function Years({ years }: { years: Year[] }) {
 }
 
 export function Aktier({ onAuthLost }: { onAuthLost: () => void }) {
-  const { data, error, reload } = usePoll<State>(`${API}/state`, 0, onAuthLost)
+  // Prices arrive a little after an import, so the page keeps asking.
+  const { data, error, reload } = usePoll<State>(`${API}/state`, 15, onAuthLost)
   const [importing, setImporting] = useState(false)
   const [clearing, setClearing] = useState(false)
 
@@ -107,7 +119,7 @@ export function Aktier({ onAuthLost }: { onAuthLost: () => void }) {
   }
 
   const summary = data.rows
-    ? `Fra dit udtræk, til og med ${fullDate(localDate(data.last ?? ''))}. Købsværdier, ikke dagens kurser.`
+    ? `Beholdningen er fra dit udtræk, til og med ${fullDate(localDate(data.last ?? ''))}. Kurserne er fra Yahoo Finance.`
     : 'Din beholdning, fra et udtræk fra Nordnet.'
 
   return (
@@ -118,7 +130,8 @@ export function Aktier({ onAuthLost }: { onAuthLost: () => void }) {
       {error && <p className="problem">{error}</p>}
 
       {!data.rows && <p className="empty">Intet importeret endnu.</p>}
-      {!!data.positions.length && <Holdings positions={data.positions} />}
+      {data.week && <section className="aktier-week"><h2>Ugen</h2><StockWeek week={data.week} /></section>}
+      {!!data.positions.length && <Holdings positions={data.positions} week={data.week} />}
       {!!data.years.length && (
         <section>
           <h2>År for år</h2>

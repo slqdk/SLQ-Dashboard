@@ -1380,3 +1380,219 @@ def test_disconnecting_removes_the_copy_and_keeps_the_log(client, monkeypatch):
     with db.connect() as con:
         assert con.execute("SELECT COUNT(*) FROM google_events").fetchone()[0] == 0
     assert _log(uid) == ["Mit møde"]
+
+
+# ---- DK live: the map on the overview ----------------------------------------------
+
+class _FakeDkLive:
+    def __init__(self, status=200, content=b"<html>kort</html>", kind="text/html"):
+        self.asked, self.response = [], httpx.Response(status, content=content, headers={"content-type": kind})
+
+    def __call__(self, url, timeout=None):
+        self.asked.append(url)
+        return self.response
+
+
+def _map(client, monkeypatch, **kwargs):
+    from app.sections.dklive import client as dk
+    fake = _FakeDkLive(**kwargs)
+    monkeypatch.setattr(dk.httpx, "get", fake)
+    assert client.put("/api/admin/setup", json={"dkliveUrl": "http://dklive:4200"}).status_code == 200
+    return fake
+
+
+def test_the_map_comes_through_the_dashboard(client, monkeypatch):
+    fake = _map(client, monkeypatch, content=b"{}", kind="application/json")
+    r = client.get("/api/s/dklive/map/api/forecast?lat=55.1&lon=9.2")
+    assert r.status_code == 200 and r.headers["content-type"].startswith("application/json")
+    assert fake.asked == ["http://dklive:4200/api/forecast?lat=55.1&lon=9.2"]
+
+
+def test_the_maps_own_files_come_through(client, monkeypatch):
+    fake = _map(client, monkeypatch, content=b"import x", kind="text/javascript")
+    assert client.get("/api/s/dklive/map/layers/flights.js").text == "import x"
+    client.get("/api/s/dklive/map/index.html?embed=1&hours=6&layers=alarms,traffic")
+    assert fake.asked[-1] == "http://dklive:4200/index.html?embed=1&hours=6&layers=alarms,traffic"
+
+
+@pytest.mark.parametrize("path", ["api/settings", "api/logs", "api/logs/forget-visitors", "api/whoami",
+                                  "api/stats/alarms"])
+def test_dk_lives_settings_stay_out_of_reach(client, monkeypatch, path):
+    fake = _map(client, monkeypatch)
+    assert client.get(f"/api/s/dklive/map/{path}").status_code == 403
+    assert not fake.asked
+
+
+def test_the_map_cannot_climb_out_of_dk_live():
+    from app.sections.dklive import client as dk
+    with pytest.raises(dk.NotOnTheMap):
+        dk.map_file("layers/../../secret", "")
+
+
+def test_the_map_only_reads(client, monkeypatch):
+    _map(client, monkeypatch)
+    assert client.post("/api/s/dklive/map/api/settings", json={}).status_code == 405
+
+
+def test_the_map_needs_the_login_and_the_section(client, family, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    from app.main import app
+    _map(client, monkeypatch)
+    me = family.get("/api/auth/status").json()["user"]
+    client.patch(f"/api/admin/users/{me['id']}", json={"sections": [s for s in me["sections"] if s != "dklive"]})
+    assert family.get("/api/s/dklive/map/index.html").status_code == 403
+    assert TestClient(app).get("/api/s/dklive/map/index.html").status_code == 401
+
+
+def test_a_silent_dk_live_is_said_plainly(client, monkeypatch):
+    from app.sections.dklive import client as dk
+    _map(client, monkeypatch)
+
+    def fails(_url, timeout=None):
+        raise httpx.ConnectError("no")
+
+    monkeypatch.setattr(dk.httpx, "get", fails)
+    r = client.get("/api/s/dklive/map/index.html")
+    assert r.status_code == 502 and "ConnectError" in r.json()["detail"]
+
+
+def test_the_layers_set_in_admin_reach_the_map(client):
+    assert client.put("/api/admin/setup", json={"dkliveLayers": ["ships", "alarms"]}).status_code == 200
+    address = client.get("/api/overview").json()["blocks"]["dklive"]["map"]
+    assert address == "/api/s/dklive/map/index.html?embed=1&hours=6&layers=ships,alarms"
+
+
+def test_an_unknown_layer_is_refused(client):
+    assert client.put("/api/admin/setup", json={"dkliveLayers": ["ubåde"]}).status_code == 400
+
+
+# ---- Aktier: prices and the week ---------------------------------------------------
+
+_TODAY = date(2026, 11, 6)
+
+
+def _priced(*rows):
+    """Rows: (isin, symbol, currency, {day: close}), straight into the database."""
+    from app.core import db
+    with db.connect() as con:
+        for isin, symbol, currency, closes in rows:
+            if isin:
+                con.execute("INSERT OR REPLACE INTO stock_symbols (isin, symbol, currency, checked_at) VALUES (?,?,?,?)",
+                            (isin, symbol, currency, "2026-11-06"))
+            con.executemany("INSERT OR REPLACE INTO stock_prices (symbol, day, close) VALUES (?,?,?)",
+                            [(symbol, day, close) for day, close in closes.items()])
+
+
+def _held(isin=_NOVO, name="Novo Nordisk B", quantity=10.0):
+    return {"name": name, "isin": isin, "depot": "5678", "quantity": quantity, "cost": 100.0, "currency": "DKK"}
+
+
+def test_the_week_is_what_todays_holdings_did(fresh_db):
+    from app.sections.aktier import prices
+    _priced((_NOVO, "NOVO-B.CO", "DKK", {"2026-10-30": 100.0, "2026-11-06": 110.0}))
+    week = prices.week([_held()], _TODAY)
+    assert week["days"][0] == "2026-10-30" and week["days"][-1] == "2026-11-06" and len(week["days"]) == 8
+    assert (week["value"], week["change"], week["changeKr"]) == (1100.0, 10.0, 100.0)
+    assert week["items"][0]["points"][:2] == [100.0, 100.0]     # a day with no price keeps the last one
+    assert week["items"][0]["change"] == 10.0 and week["missing"] == []
+
+
+def test_foreign_holdings_count_in_kroner(fresh_db):
+    from app.sections.aktier import prices
+    _priced(("IE0000000001", "FOND.DE", "EUR", {"2026-10-30": 100.0, "2026-11-06": 100.0}),
+            ("", "EURDKK=X", "", {"2026-10-30": 7.0, "2026-11-06": 8.0}))
+    week = prices.week([_held("IE0000000001", "Fond", 2.0)], _TODAY)
+    assert week["total"][0] == 1400.0 and week["value"] == 1600.0
+    assert week["items"][0]["change"] == 0.0        # the fund stood still, the krone moved
+
+
+def test_a_holding_without_a_price_is_named_not_guessed(fresh_db):
+    from app.sections.aktier import prices
+    _priced((_NOVO, "NOVO-B.CO", "DKK", {"2026-10-30": 100.0, "2026-11-06": 110.0}), (_MAERSK, "", "", {}))
+    week = prices.week([_held(), _held(_MAERSK, "Maersk B")], _TODAY)
+    assert week["missing"] == ["Maersk B"] and len(week["items"]) == 1
+
+
+def test_nothing_priced_yet_says_so(fresh_db):
+    from app.sections.aktier import prices
+    assert prices.week([_held()], _TODAY)["items"] == []
+    assert prices.week([], _TODAY) is None
+
+
+def _yahoo(monkeypatch, listings):
+    """Stands in for the two endpoints. `listings` is {isin: [(symbol, currency)]}."""
+    from app.sections.aktier import prices
+    asked = []
+    symbols = {s: c for found in listings.values() for s, c in found}
+
+    def get(url, params):
+        asked.append((url, params))
+        if url.endswith("/search"):
+            return {"quotes": [{"symbol": s} for s, _c in listings.get(params["q"], [])]}
+        symbol = url.rsplit("/", 1)[1]
+        return {"chart": {"result": [{"meta": {"currency": symbols.get(symbol, "DKK"), "gmtoffset": 3600},
+                                      "timestamp": [1793865600, 1793869200, 1793955600],
+                                      "indicators": {"quote": [{"close": [10.0, 11.0, None]}]}}]}}
+
+    monkeypatch.setattr(prices, "_get", get)
+    return asked
+
+
+def test_the_listing_in_the_right_currency_is_chosen(fresh_db, monkeypatch):
+    from app.sections.aktier import prices
+    _yahoo(monkeypatch, {"IE0000000001": [("FOND.L", "USD"), ("FOND.DE", "EUR")]})
+    assert prices.find("IE0000000001", "EUR") == ("FOND.DE", "EUR")
+    assert prices.find("IE0000000001", "SEK") == ("FOND.L", "USD")
+
+
+def test_the_last_price_of_a_day_counts_and_gaps_are_skipped(fresh_db, monkeypatch):
+    from app.sections.aktier import prices
+    _yahoo(monkeypatch, {})
+    assert prices.closes("X")[1] == {"2026-11-05": 11.0}
+
+
+def test_the_job_prices_what_is_held_and_says_what_it_cannot(client, monkeypatch):
+    from app.core import db
+    from app.sections.aktier import prices
+    _import(client, _nordnet(("1", "2023-01-10", "KØBT", "Novo Nordisk B", _NOVO, "5", "-1500", "1500", "0", "5"),
+                             ("2", "2023-01-10", "KØBT", "Maersk B", _MAERSK, "5", "-1500", "1500", "0", "5")))
+    asked = _yahoo(monkeypatch, {_NOVO: [("NOVO-B.CO", "DKK")]})
+    prices.job()
+    assert prices.status() == "Kurser på 1 af 2."
+    with db.connect() as con:
+        assert con.execute("SELECT COUNT(*) FROM stock_prices WHERE symbol='NOVO-B.CO'").fetchone()[0] == 1
+    asked.clear()
+    prices.job()
+    assert not [a for a in asked if a[0].endswith("/search") and a[1]["q"] == _NOVO]    # the symbol is remembered
+
+
+def test_only_the_isin_goes_to_yahoo(client, monkeypatch):
+    from app.sections.aktier import prices
+    _import(client)
+    asked = _yahoo(monkeypatch, {_NOVO: [("NOVO-B.CO", "DKK")]})
+    prices.job()
+    assert all(set(p) <= {"q", "quotesCount", "newsCount", "range", "interval"} for _u, p in asked)
+
+
+def test_a_failing_yahoo_keeps_the_last_prices(client, monkeypatch):
+    from app.sections.aktier import prices
+    _import(client)
+    _priced((_NOVO, "NOVO-B.CO", "DKK", {"2026-10-30": 100.0}))
+
+    def fails(_url, _params):
+        raise httpx.ConnectError("no")
+
+    monkeypatch.setattr(prices, "_get", fails)
+    prices.job()
+    assert prices.status() == "Kurser på 0 af 1."
+    assert client.get("/api/s/aktier/state").status_code == 200
+
+
+def test_the_overview_never_asks_yahoo(client, monkeypatch):
+    from app.sections.aktier import prices
+    _import(client)
+    asked = _yahoo(monkeypatch, {})
+    assert client.get("/api/overview").json()["blocks"]["aktier"]["week"]["items"] == []
+    assert not asked
+

@@ -97,6 +97,7 @@ export interface DkLive {
   ok?: boolean
   error?: string
   updated?: string
+  map?: string
   power?: Power | null
   weather?: Weather | null
   feed?: LiveUpdate[]
@@ -221,6 +222,16 @@ export interface CameraItem {
   name: string
 }
 
+export interface StockWeek {
+  days: string[]
+  total: number[]
+  value?: number
+  change?: number
+  changeKr?: number
+  items: { name: string; isin: string; points: number[]; close: number; currency: string; value: number; change: number }[]
+  missing: string[]
+}
+
 export interface Overview {
   serverTime: string
   blocks: {
@@ -228,7 +239,7 @@ export interface Overview {
     dklive?: DkLive
     news?: { items: NewsItem[]; feeds: NewsFeedState[] }
     logmylife?: { onThisDay: LifeEvent[]; latest: LifeEvent[]; total: number }
-    aktier?: { mode: string; positions: number; importedAt: string | null }
+    aktier?: { mode: string; positions: number; importedAt: string | null; week: StockWeek | null }
     familylog?: FamilyLogState
     f1?: F1Block
     latenight?: LateNightBlock

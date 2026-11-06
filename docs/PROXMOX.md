@@ -107,6 +107,10 @@ fra Transaktioner og notaer på Nordnet med hele perioden valgt, og importér de
 siden **Aktier**. Hver person ser kun sit eget, og sektionen er slået fra for
 familien som standard. Importér igen, når der er nyt: kun det nye kommer til.
 
+Kurserne hentes hver halve time fra Yahoo Finance. Det er gratis og uden nøgle, men
+ikke et officielt API, så det kan holde op med at virke. De seneste kurser bliver
+liggende, og kun ISIN-numrene sendes dertil.
+
 ## 9. Opdatering og backup
 
 ```bash

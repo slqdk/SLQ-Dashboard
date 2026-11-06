@@ -6,12 +6,12 @@ sin egen LXC på Proxmox. Lavet til pc'en; på telefonen virker det bare.
 
 | Sektion | Hvad | Kilde |
 |---|---|---|
-| **Overblik** | Dato og tid, Dagsbåndet (kalender, elpris og vejr på én tidsakse) og noget fra hver sektion | Alle |
+| **Overblik** | Dato og tid, Dagsbåndet (kalender, elpris og vejr på én tidsakse), dk-lives kort over de seneste 6 timer, og noget fra hver sektion | Alle |
 | **Kalender** | Din Google-kalender, kun læsning | Google Calendar API, én konto pr. person |
 | **DK live** | Elpriser, trafik og opdateringer, plus link til kortet | Din dk-live-container |
 | **Nyheder** | Overskrifter og korte tekster uden reklamer | RSS, hentet af serveren (DR og TV 2 som standard) |
 | **LogMyLife** | Din egen tidslinje, der husker alt | Dine indlæg, Google, Dagbog, FamilyMap, Strava-eksport |
-| **Aktier** | Din beholdning med snitkurs, udbytte og resultat pr. år, ikke dagens kurser | CSV-udtræk fra Nordnet, som du selv importerer |
+| **Aktier** | Din beholdning, ugens udvikling, snitkurs, udbytte og resultat pr. år | CSV-udtræk fra Nordnet, som du selv importerer, og kurser fra Yahoo Finance |
 | **FamilyLog** | Månedens forbrug og søgning, kun læsning | FamilyLog 0.5.0 med læsenøgle pr. person |
 | **Formel 1** | Sæsonens sessioner, ikke noget live | Jolpica |
 | **SLQ DL** | Late night-historie, dato for dato, og de nyeste monologer | Egen database med kilder, YouTube |

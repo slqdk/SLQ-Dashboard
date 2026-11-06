@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { cap, clock, inkOn, kr, one, shortDay } from '../core/format'
+import { useWidth } from '../core/useWidth'
 import type { CalendarBlock, CalendarEvent, DkLive, F1Block, HourWeather, PricePoint } from '../core/types'
 
 // Dagsbåndet: one time axis for everything on the day, like the channels of a
@@ -9,7 +10,8 @@ import type { CalendarBlock, CalendarEvent, DkLive, F1Block, HourWeather, PriceP
 const GUTTER = 118
 const RIGHT = 14
 const AXIS = 26
-const ROWS = { calendar: 62, price: 74, temp: 62, rain: 38 }
+const LANES = 3
+const ROWS = { calendar: 88, price: 60, temp: 50, rain: 32 }
 const HOUR = 3_600_000
 
 interface Block {
@@ -39,13 +41,17 @@ function blocksFrom(events: CalendarEvent[], f1: F1Block | undefined, from: numb
     raw.push({ start: ms(s.start), end: ms(s.end), title: s.name, kind: 'f1' })
   }
   const visible = raw.filter((b) => b.end > from && b.start < to).sort((a, b) => a.start - b.start)
+  // What does not fit in the lanes stays off the band: the Kalender page has it all.
   const lanes: number[] = []
-  return visible.map((b) => {
+  const placed: Block[] = []
+  for (const b of visible) {
     let lane = lanes.findIndex((end) => end <= b.start)
     if (lane < 0) lane = lanes.length
+    if (lane >= LANES) continue
     lanes[lane] = b.end
-    return { ...b, lane: Math.min(lane, 1) }
-  })
+    placed.push({ ...b, lane })
+  }
+  return placed
 }
 
 function nearest<T extends { t: string }>(list: T[], at: number, span: number): T | null {
@@ -55,19 +61,6 @@ function nearest<T extends { t: string }>(list: T[], at: number, span: number): 
     if (t <= at && at < t + span) best = item
   }
   return best
-}
-
-function useWidth() {
-  const ref = useRef<HTMLDivElement>(null)
-  const [width, setWidth] = useState(1200)
-  useEffect(() => {
-    const node = ref.current
-    if (!node) return
-    const observer = new ResizeObserver(([entry]) => setWidth(entry.contentRect.width))
-    observer.observe(node)
-    return () => observer.disconnect()
-  }, [])
-  return { ref, width }
 }
 
 interface Props {

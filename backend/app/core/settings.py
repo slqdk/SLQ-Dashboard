@@ -40,6 +40,7 @@ DEFAULTS: dict = {
     # ---- other apps ----
     "dkliveUrl": "",            # the server reads it: http://<lxc-ip>:4200
     "dkliveLink": "",           # the browser opens it; empty = dkliveUrl
+    "dkliveLayers": ["alarms", "traffic", "lightning", "radar"],    # on the overview's map
     "familylogUrl": "",         # http://30.11.0.108:8081
     # ---- Nyheder ----
     "newsFeeds": DEFAULT_FEEDS,
@@ -67,6 +68,9 @@ SECRET_KEYS = {"googleClientSecret", "nordnetApiKey", "youtubeApiKey"}
 URL_KEYS = {"publicUrl", "dkliveUrl", "dkliveLink", "familylogUrl", "go2rtcUrl"}
 TEXT_KEYS = {"googleClientId", "homeName"}
 NORDNET_MODES = ("off", "api", "csv")
+DKLIVE_LAYERS = ("flights", "military", "airports", "ships", "flow", "traffic", "trains", "autobahn", "webcams",
+                 "alarms", "radar", "forecast", "lightning", "wind", "sealevel", "navwarnings", "interconnect",
+                 "energy")
 MAX_FEEDS = 8
 
 
@@ -154,6 +158,10 @@ def _clean(key: str, value):
         return number
     if key == "newsFeeds":
         return _clean_feeds(value)
+    if key == "dkliveLayers":
+        if not isinstance(value, list) or any(v not in DKLIVE_LAYERS for v in value):
+            raise Invalid("dkliveLayers skal være en liste af dk-lives lag.")
+        return [v for v in DKLIVE_LAYERS if v in value]
     if key == "nordnetMode":
         if value not in NORDNET_MODES:
             raise Invalid("nordnetMode skal være off, api eller csv.")

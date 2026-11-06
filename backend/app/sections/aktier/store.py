@@ -11,6 +11,7 @@ that arrived with no value. No number is better than a wrong one.
 from __future__ import annotations
 
 from ...core import db, settings
+from . import prices
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS nordnet_rows (
@@ -143,15 +144,17 @@ def state(user_id: int) -> dict:
     with db.connect() as con:
         r = con.execute("SELECT COUNT(*) AS rows, MIN(booked) AS first, MAX(booked) AS last, "
                         "MAX(imported_at) AS imported FROM nordnet_rows WHERE user_id=?", (user_id,)).fetchone()
+    held = positions(user_id)
     return {"mode": _mode(), "rows": r["rows"], "first": r["first"], "last": r["last"], "importedAt": r["imported"],
-            "positions": positions(user_id), "years": years(user_id)}
+            "positions": held, "years": years(user_id), "week": prices.week(held)}
 
 
 def overview(me: dict) -> dict:
     with db.connect() as con:
         imported = con.execute("SELECT MAX(imported_at) AS at FROM nordnet_rows WHERE user_id=?",
                                (me["id"],)).fetchone()["at"]
-    return {"mode": _mode(), "positions": len(positions(me["id"])), "importedAt": imported}
+    held = positions(me["id"])
+    return {"mode": _mode(), "positions": len(held), "importedAt": imported, "week": prices.week(held)}
 
 
 def setup_status() -> dict:
@@ -162,4 +165,12 @@ def setup_status() -> dict:
         return {"ok": False, "text": "Forbindelsen til API'et er ikke bygget."}
     with db.connect() as con:
         people = con.execute("SELECT COUNT(DISTINCT user_id) AS n FROM nordnet_rows").fetchone()["n"]
-    return {"ok": True, "text": f"Importeres på siden Aktier. {people} har importeret."}
+    quotes = prices.status()
+    return {"ok": True, "text": f"Importeres på siden Aktier. {people} har importeret.{' ' + quotes if quotes else ''}"}
+
+
+def held() -> dict[str, str]:
+    """Everything anyone holds, as {isin: the currency it was bought in}."""
+    with db.connect() as con:
+        users = [r["user_id"] for r in con.execute("SELECT DISTINCT user_id FROM nordnet_rows").fetchall()]
+    return {p["isin"]: p["currency"] for user in users for p in positions(user)}

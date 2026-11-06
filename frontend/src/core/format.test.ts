@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ago, dayKey, dayName, duration, inkOn, kr, localDate, since, units, until } from './format'
+import { ago, dayKey, dayName, duration, inkOn, kr, localDate, signed, since, units, until } from './format'
 
 const now = new Date(2026, 10, 6, 7, 15) // Friday 6 November
 
@@ -8,6 +8,14 @@ describe('inkOn', () => {
     expect(inkOn('#f6bf26')).toBe('#0b1720')   // Banana
     expect(inkOn('#d50000')).toBe('#ffffff')   // Tomato
     expect(inkOn('#3f51b5')).toBe('#ffffff')   // Blueberry
+  })
+})
+
+describe('signed', () => {
+  it('always shows the direction', () => {
+    expect(signed(1.25)).toBe('+1,3')
+    expect(signed(-1200, 0)).toBe('−1.200')
+    expect(signed(0)).toBe('+0,0')
   })
 })
 

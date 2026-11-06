@@ -227,6 +227,14 @@ function Secret({ label, name, setup, value, onChange }: {
   )
 }
 
+const MAP_LAYERS: [string, string][] = [
+  ['alarms', '112-alarmer'], ['traffic', 'Trafik'], ['autobahn', 'Autobahn'], ['lightning', 'Lyn'],
+  ['radar', 'Regnradar'], ['forecast', 'Vejrudsigt'], ['wind', 'Vind (DMI)'], ['sealevel', 'Vandstand'],
+  ['flow', 'Trafiktæthed'], ['trains', 'Tog'], ['flights', 'Fly'], ['military', 'Militærfly'],
+  ['airports', 'Lufthavne'], ['ships', 'Skibe'], ['webcams', 'Webcams'], ['navwarnings', 'Navigationsadvarsler'],
+  ['interconnect', 'Elforbindelser'], ['energy', 'Strøm DK1'],
+]
+
 interface Device {
   id?: number
   [key: string]: unknown
@@ -364,7 +372,7 @@ function SetupPage({ onAuthLost }: { onAuthLost: () => void }) {
   const save = async (e: React.FormEvent) => {
     e.preventDefault()
     const keys = ['publicUrl', 'timezone', 'homeName', 'homeLat', 'homeLon', 'googleClientId',
-      'dkliveUrl', 'dkliveLink', 'familylogUrl', 'go2rtcUrl', 'nordnetMode']
+      'dkliveUrl', 'dkliveLink', 'dkliveLayers', 'familylogUrl', 'go2rtcUrl', 'nordnetMode']
     const body: Record<string, unknown> = {}
     for (const key of keys) if (!pins[key]) body[key] = form[key]
     for (const key of ['googleClientSecret', 'youtubeApiKey']) {
@@ -423,6 +431,22 @@ function SetupPage({ onAuthLost }: { onAuthLost: () => void }) {
         {status('dklive')}
         <Field label="Adresse, som serveren læser" name="dkliveUrl" form={form} pins={pins} onChange={change} hint="Fx http://<lxc-ip>:4200" />
         <Field label="Adresse til kortet i browseren" name="dkliveLink" form={form} pins={pins} onChange={change} hint="Tom = samme adresse" />
+        <div>
+          <p className="toggles-title">På kortet på overblikket</p>
+          <div className="toggles">
+            {MAP_LAYERS.map(([id, name]) => {
+              const on = ((form.dkliveLayers as string[] | undefined) ?? []).includes(id)
+              const list = (form.dkliveLayers as string[] | undefined) ?? []
+              return (
+                <label key={id} className="check">
+                  <input type="checkbox" checked={on} onChange={(e) => change('dkliveLayers', e.target.checked ? [...list, id] : list.filter((x) => x !== id))} />
+                  {name}
+                </label>
+              )
+            })}
+          </div>
+          <p className="note">Kortet viser kun ting fra de seneste 6 timer. Tryk Gem opsætning for at bruge valget.</p>
+        </div>
       </fieldset>
 
       <fieldset>
@@ -475,7 +499,7 @@ function SetupPage({ onAuthLost }: { onAuthLost: () => void }) {
             <option value="csv">Importeret udtræk</option>
           </select>
         </label>
-        <p className="note">Hver person importerer sin egen CSV-fil fra Nordnet på siden Aktier. Nordnets API tager ikke imod nye kunder, så dashboardet bruger det ikke.</p>
+        <p className="note">Hver person importerer sin egen CSV-fil fra Nordnet på siden Aktier. Kurserne hentes fra Yahoo Finance, som er gratis, men ikke et officielt API. Kun ISIN-numrene sendes dertil.</p>
       </fieldset>
 
       <div className="setup-actions">

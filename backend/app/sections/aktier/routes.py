@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Request
 
+from ...core import jobs
 from . import nordnet, store
 
 router = APIRouter(prefix="/api/s/aktier", tags=["aktier"])
@@ -23,7 +24,9 @@ async def import_export(request: Request):
         rows, skipped = nordnet.parse(body)
     except nordnet.Problem as exc:
         raise HTTPException(400, str(exc))
-    return {**store.ingest(request.state.user["id"], rows), "skipped": skipped}
+    counts = store.ingest(request.state.user["id"], rows)
+    jobs.kick()                 # new holdings need prices
+    return {**counts, "skipped": skipped}
 
 
 @router.delete("/rows")

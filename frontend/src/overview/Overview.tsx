@@ -1,13 +1,12 @@
-import { ago, clock, dayName, kr, longDate, monthName, one, since, until, whole } from '../core/format'
+import { ago, clock, dayName, kr, longDate, monthName, since, until, whole } from '../core/format'
 import { hrefOf } from '../core/routes'
 import { useNow, usePoll } from '../core/usePoll'
-import type { CalendarEvent, DkLive, LiveUpdate, Overview as Data, User } from '../core/types'
+import type { Overview as Data, User } from '../core/types'
 import { DayBand } from './DayBand'
 import { CameraFrame } from '../sections/Cameras'
-import { CalendarDot } from '../sections/common'
-import { Updates } from '../sections/DkLive'
 import { factWhen, MonologueList } from '../sections/LateNight'
 import { finishesAt, PrinterLines } from '../sections/Printers'
+import { StockWeek } from '../sections/StockWeek'
 
 const LIVE_SECONDS = 30
 const CAMERA_SECONDS = 30
@@ -44,70 +43,6 @@ function digest(data: Data | null, now: Date): string {
   return parts.join(' ')
 }
 
-function CalendarList({ events, now }: { events: CalendarEvent[]; now: Date }) {
-  const days = new Map<string, CalendarEvent[]>()
-  for (const e of events.slice(0, 9)) days.set(e.day, [...(days.get(e.day) ?? []), e])
-  return (
-    <div className="agenda">
-      {[...days].map(([day, list]) => (
-        <div key={day} className="agenda-day">
-          <h3>{dayName(day, now)}</h3>
-          <ul>
-            {list.map((e) => (
-              <li key={e.id}>
-                <span className="agenda-time">{e.allDay ? 'Hele dagen' : clock(e.start)}</span>
-                <CalendarDot color={e.color} name={e.calendar} />
-                <span>{e.title}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-function PowerSummary({ dk }: { dk: DkLive }) {
-  const p = dk.power
-  if (!p) return null
-  return (
-    <div className="power">
-      <p className="power-now">{kr(p.now)} <span>kr/kWh</span></p>
-      <dl>
-        <dt>Billigst</dt><dd>{kr(p.low.dkk)} kl. {clock(p.low.t)}</dd>
-        <dt>Dyrest</dt><dd>{kr(p.high.dkk)} kl. {clock(p.high.t)}</dd>
-      </dl>
-      <p className="note">Spotpris {p.area} uden afgifter</p>
-    </div>
-  )
-}
-
-function LiveBlock({ dk, now }: { dk?: DkLive; now: Date }) {
-  if (!dk) return null
-  if (!dk.configured) return <p className="empty">Sæt adressen til dk-live under Admin → Opsætning.</p>
-  const updates: LiveUpdate[] = dk.feed ?? []
-  const road = dk.traffic
-  return (
-    <div className="live">
-      <PowerSummary dk={dk} />
-      <div>
-        <h3>Trafik{road ? `, ${road.near} tæt på` : ''}</h3>
-        <Updates items={road?.items.slice(0, 5) ?? []} now={now} plain empty="Ingen hændelser lige nu." />
-      </div>
-      <div>
-        <h3>Opdateringer</h3>
-        <Updates items={updates} now={now} limit={6} />
-      </div>
-      {dk.updated && (
-        <p className="live-stamp">
-          <span className={`dot dot-${dk.ok ? 'good' : 'slow'}`} aria-hidden="true" />
-          {dk.ok ? `Opdateret ${since(dk.updated, now.getTime())}` : 'Viser seneste data, dk-live svarer ikke helt'}
-        </p>
-      )}
-    </div>
-  )
-}
-
 export function Overview({ user, onAuthLost }: { user: User; onAuthLost: () => void }) {
   const now = useNow(1000)
   const { data, error } = usePoll<Data>('/api/overview', LIVE_SECONDS, onAuthLost)
@@ -118,40 +53,116 @@ export function Overview({ user, onAuthLost }: { user: User; onAuthLost: () => v
   return (
     <main className="overview">
       <header className="hero">
-        <div>
+        <div className="hero-date">
           <h1>{longDate(now)}</h1>
           <p className="digest">{digest(data, now) || `Velkommen, ${user.name || user.username}.`}</p>
+          {error && <p className="problem">{error}</p>}
         </div>
+        <DayBand now={now} dk={b.dklive} calendar={b.calendar} f1={b.f1} />
         <p className="hero-clock">
           <time>{clock(now)}</time>
           <span>{String(now.getSeconds()).padStart(2, '0')}</span>
         </p>
       </header>
 
-      {error && <p className="problem">{error}</p>}
+      <div className="middle">
+        <div className="side">
+          {b.latenight && (
+            <Block id="latenight" title="SLQ DL" className="dl">
+              {dlFacts.slice(0, 2).map((f) => (
+                <article key={f.id}>
+                  <p className="dl-when">{factWhen(f, b.latenight?.date ?? '')}</p>
+                  <p className="dl-title">{f.title}</p>
+                  {f.body && <p className="dl-body">{f.body}</p>}
+                </article>
+              ))}
+              {!!b.latenight.monologues?.length && (
+                <div className="monologues">
+                  <h3>Nyeste monologer</h3>
+                  <MonologueList items={b.latenight.monologues} now={now} />
+                </div>
+              )}
+            </Block>
+          )}
 
-      <DayBand now={now} dk={b.dklive} calendar={b.calendar} f1={b.f1} />
+          {b.logmylife && (
+            <Block id="logmylife" title="LogMyLife">
+              {b.logmylife.onThisDay.length > 0 ? (
+                <ul className="life">
+                  {b.logmylife.onThisDay.map((e) => (
+                    <li key={e.id}>
+                      <span className="meta">{now.getFullYear() - Number(e.day.slice(0, 4))} år siden</span>
+                      <span>{e.title}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : b.logmylife.latest.length > 0 ? (
+                <ul className="life">
+                  {b.logmylife.latest.map((e) => (
+                    <li key={e.id}><span className="meta">{e.day}</span><span>{e.title}</span></li>
+                  ))}
+                </ul>
+              ) : <p className="empty">Tidslinjen er tom. <a href={hrefOf('logmylife')}>Skriv det første indlæg</a>.</p>}
+              {b.logmylife.total > 0 && <p className="note">{whole(b.logmylife.total)} begivenheder i alt</p>}
+            </Block>
+          )}
+        </div>
 
-      <div className="blocks">
-        {b.calendar && (
-          <Block id="calendar" title="Kalender" className="w4">
-            {!b.calendar.connected ? (
-              <p className="empty">Din Google-kalender er ikke forbundet.{' '}
-                <a href={hrefOf('calendar')}>Forbind den her</a>.</p>
-            ) : b.calendar.events.length ? (
-              <CalendarList events={b.calendar.events} now={now} />
-            ) : <p className="empty">Intet de næste 10 dage.</p>}
-          </Block>
-        )}
+        <div className="map-frame">
+          {b.dklive?.configured && <iframe src={b.dklive.map} title="Kort over Danmark og Nordtyskland" />}
+          {b.dklive && !b.dklive.configured && <p className="empty">Sæt adressen til dk-live under Admin → Opsætning.</p>}
+        </div>
 
-        {b.dklive && (
-          <Block id="dklive" title="DK live" className="w8">
-            <LiveBlock dk={b.dklive} now={now} />
-          </Block>
-        )}
+        <div className="side">
+          {!!b.cameras?.cameras.length && (
+            <Block id="cameras" title="Kameraer">
+              <div className="cameras small">
+                {b.cameras.cameras.map((c) => (
+                  <a key={c.id} className="cam" href={hrefOf('cameras')}>
+                    <CameraFrame camera={c} seconds={CAMERA_SECONDS} />
+                    <span>{c.name}</span>
+                  </a>
+                ))}
+              </div>
+            </Block>
+          )}
 
+          {!!b.printers?.printers.length && (
+            <Block id="printers" title="Printere">
+              <PrinterLines printers={b.printers.printers} now={now} />
+            </Block>
+          )}
+
+          {b.familylog && (
+            <Block id="familylog" title="FamilyLog">
+              {b.familylog.month ? (
+                <>
+                  <p className="fl-spent">{whole(b.familylog.month.spent)} kr</p>
+                  <p className="note">brugt i {monthName(now)}</p>
+                </>
+              ) : (
+                <p className="empty">{b.familylog.connected ? 'Forbundet, kun læsning.' : 'Mangler læsenøgle.'}</p>
+              )}
+            </Block>
+          )}
+
+          {b.links && (
+            <Block id="links" title="Links">
+              {b.links.pinned.length ? (
+                <ul className="pinned">
+                  {b.links.pinned.map((l) => (
+                    <li key={l.id}><a href={l.url} target="_blank" rel="noreferrer noopener">{l.title}</a></li>
+                  ))}
+                </ul>
+              ) : <p className="empty">{b.links.total ? 'Fastgør et link, så står det her.' : 'Ingen links endnu.'}</p>}
+            </Block>
+          )}
+        </div>
+      </div>
+
+      <div className="bottom">
         {b.news && (
-          <Block id="news" title="Nyheder" className="w5">
+          <Block id="news" title="Nyheder">
             {b.news.items.length ? (
               <ul className="headlines">
                 {b.news.items.map((n) => (
@@ -165,26 +176,17 @@ export function Overview({ user, onAuthLost }: { user: User; onAuthLost: () => v
           </Block>
         )}
 
-        {b.latenight && (
-          <Block id="latenight" title="SLQ DL" className="w4 dl">
-            {dlFacts.slice(0, 2).map((f) => (
-              <article key={f.id}>
-                <p className="dl-when">{factWhen(f, b.latenight?.date ?? '')}</p>
-                <p className="dl-title">{f.title}</p>
-                {f.body && <p className="dl-body">{f.body}</p>}
-              </article>
-            ))}
-            {!!b.latenight.monologues?.length && (
-              <div className="monologues">
-                <h3>Nyeste monologer</h3>
-                <MonologueList items={b.latenight.monologues} now={now} />
-              </div>
+        {b.aktier && (
+          <Block id="aktier" title="Aktier">
+            {b.aktier.week ? <StockWeek week={b.aktier.week} /> : (
+              <p className="empty">{b.aktier.mode === 'csv' ? 'Intet importeret endnu.' : 'Nordnet er ikke forbundet.'}</p>
             )}
+            {b.aktier.importedAt && <p className="note">Beholdning importeret {since(b.aktier.importedAt, now.getTime())}</p>}
           </Block>
         )}
 
         {b.f1 && (
-          <Block id="f1" title="Formel 1" className="w3">
+          <Block id="f1" title="Formel 1">
             {b.f1.next ? (
               <>
                 <p className="f1-meeting">{b.f1.meeting}</p>
@@ -201,90 +203,7 @@ export function Overview({ user, onAuthLost }: { user: User; onAuthLost: () => v
             ) : <p className="empty">Sæsonplanen er ikke hentet endnu.</p>}
           </Block>
         )}
-
-        {b.logmylife && (
-          <Block id="logmylife" title="LogMyLife" className="w5">
-            {b.logmylife.onThisDay.length > 0 ? (
-              <ul className="life">
-                {b.logmylife.onThisDay.map((e) => (
-                  <li key={e.id}>
-                    <span className="meta">{now.getFullYear() - Number(e.day.slice(0, 4))} år siden</span>
-                    <span>{e.title}</span>
-                  </li>
-                ))}
-              </ul>
-            ) : b.logmylife.latest.length > 0 ? (
-              <ul className="life">
-                {b.logmylife.latest.map((e) => (
-                  <li key={e.id}><span className="meta">{e.day}</span><span>{e.title}</span></li>
-                ))}
-              </ul>
-            ) : <p className="empty">Tidslinjen er tom. <a href={hrefOf('logmylife')}>Skriv det første indlæg</a>.</p>}
-            {b.logmylife.total > 0 && <p className="note">{whole(b.logmylife.total)} begivenheder i alt</p>}
-          </Block>
-        )}
-
-        {b.links && (
-          <Block id="links" title="Links" className="w3">
-            {b.links.pinned.length ? (
-              <ul className="pinned">
-                {b.links.pinned.map((l) => (
-                  <li key={l.id}><a href={l.url} target="_blank" rel="noreferrer noopener">{l.title}</a></li>
-                ))}
-              </ul>
-            ) : <p className="empty">{b.links.total ? 'Fastgør et link, så står det her.' : 'Ingen links endnu.'}</p>}
-          </Block>
-        )}
-
-        {b.aktier && (
-          <Block id="aktier" title="Aktier" className="w2">
-            {b.aktier.positions ? (
-              <>
-                <p className="fl-spent">{b.aktier.positions}</p>
-                <p className="note">værdipapirer{b.aktier.importedAt ? `, importeret ${since(b.aktier.importedAt, now.getTime())}` : ''}</p>
-              </>
-            ) : (
-              <p className="empty">{b.aktier.mode === 'csv' ? 'Intet importeret endnu.' : 'Nordnet er ikke forbundet.'}</p>
-            )}
-          </Block>
-        )}
-
-        {b.familylog && (
-          <Block id="familylog" title="FamilyLog" className="w2">
-            {b.familylog.month ? (
-              <>
-                <p className="fl-spent">{whole(b.familylog.month.spent)} kr</p>
-                <p className="note">brugt i {monthName(now)}</p>
-              </>
-            ) : (
-              <p className="empty">{b.familylog.connected ? 'Forbundet, kun læsning.' : 'Mangler læsenøgle.'}</p>
-            )}
-          </Block>
-        )}
-
-        {!!b.cameras?.cameras.length && (
-          <Block id="cameras" title="Kameraer" className="w8">
-            <div className="cameras small">
-              {b.cameras.cameras.map((c) => (
-                <a key={c.id} className="cam" href={hrefOf('cameras')}>
-                  <CameraFrame camera={c} seconds={CAMERA_SECONDS} />
-                  <span>{c.name}</span>
-                </a>
-              ))}
-            </div>
-          </Block>
-        )}
-
-        {!!b.printers?.printers.length && (
-          <Block id="printers" title="Printere" className="w4">
-            <PrinterLines printers={b.printers.printers} now={now} />
-          </Block>
-        )}
       </div>
-
-      {data?.blocks.dklive?.weather?.temp != null && (
-        <p className="sr-only">{one(data.blocks.dklive.weather.temp)} grader</p>
-      )}
     </main>
   )
 }

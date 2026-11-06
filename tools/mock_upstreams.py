@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Stand-ins for everything the dashboard reads, for development and the
-browser check: dk-live, Jolpica, RSS, Google and go2rtc. Everything it serves is
-made up. Standard library only. The printers have their own stand-in,
+browser check: dk-live, Jolpica, RSS, Google, go2rtc and Yahoo Finance. Everything
+it serves is made up. Standard library only. The printers have their own stand-in,
 tools/mock_printer.py.
 
     python3 tools/mock_upstreams.py 9100
@@ -15,6 +15,8 @@ Then start the backend with (see tools/dev.sh):
     APP_GOOGLE_API_BASE=http://127.0.0.1:9100/google/api
     APP_YOUTUBE_FEED_URL=http://127.0.0.1:9100/youtube
     APP_GO2RTC_URL=http://127.0.0.1:9100/go2rtc
+    APP_YAHOO_SEARCH_URL=http://127.0.0.1:9100/yahoo/search
+    APP_YAHOO_CHART_URL=http://127.0.0.1:9100/yahoo/chart
 """
 from __future__ import annotations
 
@@ -24,7 +26,7 @@ import math
 import sys
 from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import parse_qs, urlencode, urlparse
+from urllib.parse import parse_qs, unquote, urlencode, urlparse
 from zoneinfo import ZoneInfo
 
 CPH = ZoneInfo("Europe/Copenhagen")
@@ -49,6 +51,22 @@ CAMERA_PICTURE = base64.b64decode(
     "hE8JDIWHhIZAw8JDaDDwkMhE8JDIRe01MSSSSSSSSSSSST59Gx4aeunVGx1TmnVGx1TmnVGx1TmnVGx0a5p1RsdG"
     "gx0NNAkkkkkkkkkkkkkkkn//2Q==")
 STREAMS: dict[str, str] = {}
+
+
+# ---- Yahoo Finance ---------------------------------------------------------------
+
+LISTINGS = {"DK0000000001": ("EKS.CO", "DKK", 300.0), "IE0000000001": ("FOND.DE", "EUR", 40.0)}
+
+
+def yahoo_chart(symbol: str) -> dict:
+    """A month of closes, wandering a little, as Yahoo's chart answers."""
+    listing = next((v for v in LISTINGS.values() if v[0] == symbol), (symbol, "DKK", 7.46))
+    start = now().replace(hour=12, minute=0, second=0, microsecond=0) - timedelta(days=30)
+    days = [start + timedelta(days=i) for i in range(31)]
+    closes = [round(listing[2] * (1 + .02 * math.sin(i / 3)), 3) for i in range(31)]
+    return {"chart": {"result": [{"meta": {"currency": listing[1], "gmtoffset": 3600},
+                                  "timestamp": [int(d.timestamp()) for d in days],
+                                  "indicators": {"quote": [{"close": closes}]}}]}}
 
 
 # ---- dk-live ---------------------------------------------------------------------
@@ -253,6 +271,17 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
             return None
+        if path == "/index.html":
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.end_headers()
+            self.wfile.write('<!doctype html><body style="background:#0b1720;color:#e9eff1">Eksempel: dk-lives kort</body>'.encode())
+            return None
+        if path == "/yahoo/search":
+            listing = LISTINGS.get(query["q"][0])
+            return self._json({"quotes": [{"symbol": listing[0]}] if listing else []})
+        if path.startswith("/yahoo/chart/"):
+            return self._json(yahoo_chart(unquote(path.removeprefix("/yahoo/chart/"))))
         if path == "/go2rtc/api/streams":
             return self._json({name: {"producers": [{"url": "rtsp://***@"}]} for name in STREAMS})
         if path == "/go2rtc/api/frame.jpeg":

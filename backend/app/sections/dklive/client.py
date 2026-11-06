@@ -219,7 +219,43 @@ def state() -> dict:
 def overview(_me: dict) -> dict:
     out = state()
     out["feed"] = headline_updates(out.get("feed") or [], datetime.now(timezone.utc))[:6]
+    out["map"] = map_address(settings.load().get("dkliveLayers") or [])
     return out
+
+
+# ---- dk-live's own map, through the dashboard ------------------------------------
+
+MAP_PATH = "/api/s/dklive/map"
+MAP_HOURS = 6
+# What the map reads. dk-live trusts its home network, which the dashboard is on, so
+# its settings and logs must not be reachable through here.
+MAP_FEEDS = ("flights", "ships", "odin", "traffic", "radar", "lightning", "trains", "autobahn", "webcams", "wind",
+             "sealevel", "navwarnings", "energy", "airports", "flow", "forecast", "config", "photo")
+
+
+class NotOnTheMap(RuntimeError):
+    """A path outside what the map needs."""
+
+
+class MapUnavailable(RuntimeError):
+    """dk-live gave no answer; the text is shown to the person."""
+
+
+def map_address(layers: list[str]) -> str:
+    return f"{MAP_PATH}/index.html?embed=1&hours={MAP_HOURS}&layers={','.join(layers)}"
+
+
+def map_file(path: str, query: str) -> httpx.Response:
+    feed = path.removeprefix("api/").split("/")[0]
+    if ".." in path or (path.startswith("api/") and feed not in MAP_FEEDS):
+        raise NotOnTheMap(path)
+    base = (settings.load().get("dkliveUrl") or "").rstrip("/")
+    if not base:
+        raise MapUnavailable("Adressen til dk-live mangler.")
+    try:
+        return httpx.get(f"{base}/{path or 'index.html'}{'?' + query if query else ''}", timeout=TIMEOUT)
+    except httpx.HTTPError as exc:
+        raise MapUnavailable(f"dk-live svarer ikke ({type(exc).__name__}).") from None
 
 
 def setup_status() -> dict:
