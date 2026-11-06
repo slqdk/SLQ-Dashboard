@@ -195,7 +195,7 @@ def google_events(query: dict) -> dict:
 
     items = [
         {"id": "e1", "summary": "Eksempel: kursusdag", "start": {"dateTime": at(0, 9)}, "end": {"dateTime": at(0, 15, 30)}},
-        {"id": "e2", "summary": "Eksempel: træning", "start": {"dateTime": at(0, 18)}, "end": {"dateTime": at(0, 19, 30)}, "location": "Hallen"},
+        {"id": "e2", "summary": "Eksempel: træning", "start": {"dateTime": at(0, 18)}, "end": {"dateTime": at(0, 19, 30)}, "location": "Hallen", "colorId": "11"},
         {"id": "e3", "summary": "Eksempel: hele dagen", "start": {"date": (base + timedelta(days=1)).strftime("%Y-%m-%d")},
          "end": {"date": (base + timedelta(days=2)).strftime("%Y-%m-%d")}},
         {"id": "e4", "summary": "Eksempel: tandlæge", "start": {"dateTime": at(1, 10)}, "end": {"dateTime": at(1, 11)}},
@@ -203,6 +203,13 @@ def google_events(query: dict) -> dict:
         {"id": "e6", "status": "cancelled"},
     ]
     return {"items": items, "nextSyncToken": "sync-1"}
+
+
+def family_events(query: dict) -> dict:
+    tomorrow = now().astimezone(CPH).replace(hour=12, minute=0, second=0, microsecond=0) + timedelta(days=1)
+    item = {"id": "f1", "summary": "Eksempel: familiefest", "start": {"dateTime": tomorrow.isoformat()},
+            "end": {"dateTime": (tomorrow + timedelta(hours=2)).isoformat()}}
+    return {"items": [] if query.get("syncToken") else [item], "nextSyncToken": "sync-1"}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -264,10 +271,10 @@ class Handler(BaseHTTPRequestHandler):
             return None
         if path == "/google/api/users/me/calendarList":
             return self._json({"items": [
-                {"id": "mig@example.com", "summary": "Min kalender", "primary": True, "backgroundColor": "#4790dc"},
-                {"id": "familie@example.com", "summary": "Familien", "backgroundColor": "#1fa68e"}]})
+                {"id": "mig@example.com", "summary": "Min kalender", "primary": True, "colorId": "15", "backgroundColor": "#9fc6e7"},
+                {"id": "familie@example.com", "summary": "Familien", "colorId": "13", "backgroundColor": "#92e1c0"}]})
         if path.startswith("/google/api/calendars/"):
-            data = google_events(query) if "mig" in path else {"items": [], "nextSyncToken": "sync-1"}
+            data = google_events(query) if "mig" in path else family_events(query)
             status = data.pop("__status", 200)
             return self._json(data, status)
         return self._json({"error": "not found"}, 404)

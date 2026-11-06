@@ -1,9 +1,10 @@
 import { ago, clock, dayName, kr, longDate, monthName, one, since, until, whole } from '../core/format'
 import { hrefOf } from '../core/routes'
 import { useNow, usePoll } from '../core/usePoll'
-import type { DkLive, LifeEvent, LiveUpdate, Overview as Data, User } from '../core/types'
+import type { CalendarEvent, DkLive, LiveUpdate, Overview as Data, User } from '../core/types'
 import { DayBand } from './DayBand'
 import { CameraFrame } from '../sections/Cameras'
+import { CalendarDot } from '../sections/common'
 import { Updates } from '../sections/DkLive'
 import { factWhen, MonologueList } from '../sections/LateNight'
 import { finishesAt, PrinterLines } from '../sections/Printers'
@@ -43,8 +44,8 @@ function digest(data: Data | null, now: Date): string {
   return parts.join(' ')
 }
 
-function CalendarList({ events, now }: { events: LifeEvent[]; now: Date }) {
-  const days = new Map<string, LifeEvent[]>()
+function CalendarList({ events, now }: { events: CalendarEvent[]; now: Date }) {
+  const days = new Map<string, CalendarEvent[]>()
   for (const e of events.slice(0, 9)) days.set(e.day, [...(days.get(e.day) ?? []), e])
   return (
     <div className="agenda">
@@ -55,6 +56,7 @@ function CalendarList({ events, now }: { events: LifeEvent[]; now: Date }) {
             {list.map((e) => (
               <li key={e.id}>
                 <span className="agenda-time">{e.allDay ? 'Hele dagen' : clock(e.start)}</span>
+                <CalendarDot color={e.color} name={e.calendar} />
                 <span>{e.title}</span>
               </li>
             ))}

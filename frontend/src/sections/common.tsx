@@ -14,6 +14,11 @@ export function SectionHead({ title, text, children }: {
   )
 }
 
+/** The colour of a calendar, as in Google's own. */
+export function CalendarDot({ color, name }: { color: string; name?: string }) {
+  return <span className="cal-dot" style={color ? { background: color } : undefined} title={name} aria-hidden="true" />
+}
+
 /** A native <dialog>: focus, Esc and the backdrop come with it. */
 export function Dialog({ title, wide, onClose, children }: {
   title: string; wide?: boolean; onClose: () => void; children: React.ReactNode

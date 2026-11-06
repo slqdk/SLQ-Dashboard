@@ -7,6 +7,16 @@ const dayShort = new Intl.DateTimeFormat(da, { weekday: 'short', day: 'numeric',
 const weekdayLong = new Intl.DateTimeFormat(da, { weekday: 'long' })
 const dateFull = new Intl.DateTimeFormat(da, { day: 'numeric', month: 'long', year: 'numeric' })
 
+/** What reads best on a block of this colour: the dashboard's dark ink, or white. */
+export function inkOn(hex: string): string {
+  const channel = (at: number) => {
+    const v = parseInt(hex.slice(at, at + 2), 16) / 255
+    return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4
+  }
+  const light = 0.2126 * channel(1) + 0.7152 * channel(3) + 0.0722 * channel(5)
+  return light > 0.197 ? '#0b1720' : '#ffffff'
+}
+
 export const cap = (s: string) => (s ? s[0].toUpperCase() + s.slice(1) : s)
 
 export const longDate = (d: Date) => cap(dateLong.format(d))

@@ -7,8 +7,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 
-from ...core import google, logs, settings
-from ..logmylife import store as life
+from ...core import google, jobs, logs, settings
 from . import sync
 
 router = APIRouter(prefix="/api/s/calendar", tags=["calendar"])
@@ -31,7 +30,7 @@ def redirect_uri(request: Request) -> str:
 @router.get("/state")
 def state(request: Request):
     me = request.state.user["id"]
-    return {**sync.state_of(me), "events": life.upcoming(me, days=31, limit=300)}
+    return {**sync.state_of(me), "events": sync.upcoming(me, days=31, limit=300)}
 
 
 @router.post("/connect")
@@ -51,6 +50,21 @@ class Selected(BaseModel):
 @router.put("/selected")
 def selected(body: Selected, request: Request):
     sync.select(request.state.user["id"], body.calendarId, body.selected)
+    jobs.kick()
+    return sync.state_of(request.state.user["id"])
+
+
+class LogCalendar(BaseModel):
+    calendarId: str
+
+
+@router.put("/log-calendar")
+def log_calendar(body: LogCalendar, request: Request):
+    try:
+        sync.set_log_calendar(request.state.user["id"], body.calendarId)
+    except LookupError as exc:
+        raise HTTPException(404, str(exc))
+    jobs.kick()
     return sync.state_of(request.state.user["id"])
 
 

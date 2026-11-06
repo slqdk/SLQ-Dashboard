@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 import { api } from '../core/api'
-import { ago, clock, cap, dayName, monthName, shortDay, whole } from '../core/format'
+import { clock, cap, dayName, monthName, shortDay, since, whole } from '../core/format'
 import { hrefOf, readRoute } from '../core/routes'
 import { useNow, usePoll } from '../core/usePoll'
-import type { F1Session, FamilyLogState, LifeEvent, NewsFeedState, NewsItem, User } from '../core/types'
-import { SectionHead } from './common'
+import type { CalendarEvent, F1Session, FamilyLogState, NewsFeedState, NewsItem, User } from '../core/types'
+import { CalendarDot, Dialog, SectionHead } from './common'
 
 // ---- Kalender ---------------------------------------------------------------
 
@@ -15,8 +15,16 @@ interface CalendarState {
   status: string
   lastSyncAt: string | null
   lastError: string
-  calendars: { id: string; summary: string; color: string; selected: boolean }[]
-  events: LifeEvent[]
+  calendars: GoogleCalendar[]
+  events: CalendarEvent[]
+}
+
+interface GoogleCalendar {
+  id: string
+  summary: string
+  color: string
+  selected: boolean
+  toLog: boolean
 }
 
 const CONNECT_RESULT: Record<string, string> = {
@@ -29,6 +37,7 @@ export function Calendar({ onAuthLost }: { onAuthLost: () => void }) {
   const { data, reload, error } = usePoll<CalendarState>('/api/s/calendar/state', 60, onAuthLost)
   const [busy, setBusy] = useState(false)
   const [problem, setProblem] = useState(() => CONNECT_RESULT[readRoute().query.get('google') ?? ''] ?? '')
+  const [moving, setMoving] = useState<GoogleCalendar | null>(null)
 
   // The first sync runs on the server just after Google sends the browser back.
   useEffect(() => {
@@ -56,12 +65,14 @@ export function Calendar({ onAuthLost }: { onAuthLost: () => void }) {
     setBusy(false)
   }
 
-  const days = new Map<string, LifeEvent[]>()
+  const days = new Map<string, CalendarEvent[]>()
   for (const e of data?.events ?? []) days.set(e.day, [...(days.get(e.day) ?? []), e])
+  const logged = data?.calendars.find((c) => c.toLog)
+  const move = (id: string) => setMoving(data?.calendars.find((c) => c.id === id) ?? null)
 
   return (
     <main className="page">
-      <SectionHead title="Kalender" text="Din Google-kalender, kun læsning. Alt gemmes også i LogMyLife.">
+      <SectionHead title="Kalender" text={`Dine Google-kalendere, kun læsning.${logged ? ` ${logged.summary} gemmes også i LogMyLife.` : ''}`}>
         {data?.connected && (
           <>
             <button disabled={busy} onClick={() => void act('sync')}>Hent nu</button>
@@ -91,6 +102,7 @@ export function Calendar({ onAuthLost }: { onAuthLost: () => void }) {
                   {list.map((e) => (
                     <li key={e.id}>
                       <span className="agenda-time">{e.allDay ? 'Hele dagen' : `${clock(e.start)}${e.end ? `–${clock(e.end)}` : ''}`}</span>
+                      <CalendarDot color={e.color} name={e.calendar} />
                       <span>{e.title}{e.location ? <span className="meta"> {e.location}</span> : null}</span>
                     </li>
                   ))}
@@ -101,7 +113,7 @@ export function Calendar({ onAuthLost }: { onAuthLost: () => void }) {
           </div>
           <aside>
             <h2>Kalendere</h2>
-            <p className="meta">{data.email}{data.lastSyncAt ? `, hentet for ${ago(data.lastSyncAt, now.getTime())} siden` : ''}</p>
+            <p className="meta">{data.email}{data.lastSyncAt ? `, hentet ${since(data.lastSyncAt, now.getTime())}` : ''}</p>
             {data.lastError && <p className="problem">{data.lastError}</p>}
             <ul className="check-list">
               {data.calendars.map((c) => (
@@ -109,13 +121,28 @@ export function Calendar({ onAuthLost }: { onAuthLost: () => void }) {
                   <label className="check">
                     <input type="checkbox" checked={c.selected}
                       onChange={(e) => void act('selected', { calendarId: c.id, selected: e.target.checked })} />
+                    <CalendarDot color={c.color} />
                     {c.summary}
                   </label>
                 </li>
               ))}
             </ul>
+            <label className="log-calendar">Gemmes i LogMyLife
+              <select disabled={busy} value={logged?.id ?? ''} onChange={(e) => move(e.target.value)}>
+                {data.calendars.map((c) => <option key={c.id} value={c.id}>{c.summary}</option>)}
+              </select>
+            </label>
           </aside>
         </div>
+      )}
+      {moving && (
+        <Dialog title="Skift kalender til LogMyLife" onClose={() => setMoving(null)}>
+          <p>{logged ? `Det, der kom fra ${logged.summary}, fjernes fra din tidslinje, og ${moving.summary} kommer ind i stedet.` : `${moving.summary} kommer ind på din tidslinje.`}</p>
+          <div className="dialog-actions">
+            <button onClick={() => setMoving(null)}>Annullér</button>
+            <button className="primary" onClick={() => { setMoving(null); void act('log-calendar', { calendarId: moving.id }) }}>Skift</button>
+          </div>
+        </Dialog>
       )}
     </main>
   )
@@ -144,7 +171,7 @@ export function News({ onAuthLost }: { onAuthLost: () => void }) {
           <li key={n.url}>
             <a href={n.url} target="_blank" rel="noreferrer noopener">{n.title}</a>
             {n.summary && <p>{n.summary}</p>}
-            <p className="meta">{n.source}{n.at ? `, ${ago(n.at, now.getTime())} siden` : ''}</p>
+            <p className="meta">{n.source}{n.at ? `, ${since(n.at, now.getTime())}` : ''}</p>
           </li>
         ))}
       </ul>

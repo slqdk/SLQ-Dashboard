@@ -116,6 +116,10 @@ await page.click('button:has-text("Forbind Google")')
 await page.waitForURL(/google=ok/)
 await page.waitForSelector('text=Eksempel: kursusdag', { timeout: 10_000 })
 check(true, 'Google connected, events arrive')
+await page.waitForSelector('text=Eksempel: familiefest', { timeout: 10_000 })
+check(true, 'every ticked calendar is on the page')
+check(await page.locator('.agenda-day li:has-text("Eksempel: træning") .cal-dot').getAttribute('style').then((s) => s.includes('213, 0, 0')), 'an event keeps its own colour')
+check(await page.locator('.check-list li:has-text("Familien") .cal-dot').getAttribute('style').then((s) => s.includes('51, 182, 121')), 'a calendar has the modern shade of its colour')
 await shot('kalender')
 
 // ---- Links -------------------------------------------------------------------------
@@ -154,6 +158,7 @@ await page.click('dialog button:has-text("Gem")')
 await page.waitForSelector('.life-title:has-text("Første dag som kursusleder")')
 check(true, 'own entry saved')
 check(await page.locator('.life-title:has-text("fortidsminde")').count() === 1, 'a past calendar event is in the log')
+check(await page.locator('.life-title:has-text("familiefest")').count() === 0, 'only the main calendar reaches the log')
 check(await page.locator('.on-this-day:has-text("Første dag som kursusleder")').count() === 1, 'on this day finds it')
 await page.click('button:has-text("Importér fra Strava")')
 await page.setInputFiles('dialog input[type="file"]', {

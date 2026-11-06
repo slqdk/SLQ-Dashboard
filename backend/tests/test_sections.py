@@ -1214,3 +1214,169 @@ def test_imported_rows_can_be_removed(client):
     _import(client)
     client.delete("/api/s/aktier/rows")
     assert client.get("/api/s/aktier/state").json()["rows"] == 0
+
+
+# ---- Kalender: colours, and one calendar to the log --------------------------------
+
+_MAIN = {"id": "mig@x.dk", "summary": "Min", "color": "#4285f4", "primary": True}
+_FAMILY = {"id": "familie@x.dk", "summary": "Familien", "color": "#33b679", "primary": False}
+
+
+def _event(id_, title, **extra):
+    day = (datetime.now(CPH) + timedelta(days=1)).strftime("%Y-%m-%d")
+    return {"id": id_, "summary": title, "start": {"dateTime": f"{day}T10:00:00+01:00"},
+            "end": {"dateTime": f"{day}T11:00:00+01:00"}, **extra}
+
+
+def _connected(client, monkeypatch, events, calendars=(_MAIN, _FAMILY)):
+    """An account with these calendars. `events` is {calendar id: items}, and can be changed."""
+    from app.core import db, google, vault
+    uid = _me(client)
+    with db.connect() as con:
+        con.execute("INSERT INTO google_accounts (user_id, email, refresh_token, connected_at) VALUES (?,?,?,?)",
+                    (uid, "mig@x.dk", vault.seal("refresh"), db.utcnow()))
+    tokens = []
+
+    def read(_t, calendar, token):
+        tokens.append((calendar, token))
+        return events.get(calendar, []), "tok"
+
+    monkeypatch.setattr(google, "access_token", lambda _r: "token")
+    monkeypatch.setattr(google, "calendars", lambda _t: list(calendars))
+    monkeypatch.setattr(google, "events", read)
+    return uid, tokens
+
+
+def _page(client):
+    return client.get("/api/s/calendar/state").json()
+
+
+def _log(uid):
+    from app.core import db
+    with db.connect() as con:
+        return [r["title"] for r in con.execute("SELECT title FROM life_events WHERE user_id=? ORDER BY title",
+                                                (uid,)).fetchall()]
+
+
+def test_colours_are_the_ones_google_shows():
+    from app.core import google
+    assert google.shown_color("#9FC6E7") == "#4285f4"       # the API's classic Cobalt
+    assert google.shown_color("#123456") == "#123456"       # mixed by the person
+    assert google.shown_color("") == ""
+
+
+def test_only_the_main_calendar_reaches_the_log(client, monkeypatch):
+    from app.sections.calendar import sync
+    uid, _tokens = _connected(client, monkeypatch, {"mig@x.dk": [_event("a", "Mit møde")],
+                                                    "familie@x.dk": [_event("b", "Fødselsdag")]})
+    sync.sync_user(uid)
+    assert _log(uid) == ["Mit møde"]
+    page = _page(client)
+    assert {(e["title"], e["color"], e["calendar"]) for e in page["events"]} == {
+        ("Mit møde", "#4285f4", "Min"), ("Fødselsdag", "#33b679", "Familien")}
+    assert [c["id"] for c in page["calendars"] if c["toLog"]] == ["mig@x.dk"]
+    assert len(client.get("/api/overview").json()["blocks"]["calendar"]["events"]) == 2
+
+
+def test_an_event_can_have_its_own_colour(client, monkeypatch):
+    from app.sections.calendar import sync
+    uid, _tokens = _connected(client, monkeypatch, {"mig@x.dk": [_event("a", "Rød", colorId="11")]})
+    sync.sync_user(uid)
+    assert _page(client)["events"][0]["color"] == "#d50000"
+
+
+def test_an_unticked_calendar_leaves_the_page(client, monkeypatch):
+    from app.sections.calendar import sync
+    uid, _tokens = _connected(client, monkeypatch, {"familie@x.dk": [_event("b", "Fødselsdag")]})
+    sync.sync_user(uid)
+    client.put("/api/s/calendar/selected", json={"calendarId": "familie@x.dk", "selected": False})
+    assert _page(client)["events"] == []
+
+
+def test_the_main_calendar_feeds_the_log_even_unticked(client, monkeypatch):
+    from app.sections.calendar import sync
+    uid, _tokens = _connected(client, monkeypatch, {"mig@x.dk": [_event("a", "Mit møde")]})
+    sync.sync_user(uid)
+    client.put("/api/s/calendar/selected", json={"calendarId": "mig@x.dk", "selected": False})
+    sync.sync_user(uid)
+    assert _page(client)["events"] == [] and _log(uid) == ["Mit møde"]
+
+
+def test_a_cancelled_event_leaves_the_page_and_stays_in_the_log(client, monkeypatch):
+    from app.core import db
+    from app.sections.calendar import sync
+    events = {"mig@x.dk": [_event("a", "Mit møde")]}
+    uid, _tokens = _connected(client, monkeypatch, events)
+    sync.sync_user(uid)
+    events["mig@x.dk"] = [{"id": "a", "status": "cancelled"}]
+    sync.sync_user(uid)
+    assert _page(client)["events"] == []
+    with db.connect() as con:
+        assert con.execute("SELECT deleted_at_source FROM life_events").fetchone()[0]
+
+
+def test_moving_the_log_to_another_calendar(client, monkeypatch):
+    from app.sections.calendar import sync
+    uid, tokens = _connected(client, monkeypatch, {"mig@x.dk": [_event("a", "Mit møde")],
+                                                   "familie@x.dk": [_event("b", "Fødselsdag")]})
+    sync.sync_user(uid)
+    assert client.put("/api/s/calendar/log-calendar", json={"calendarId": "familie@x.dk"}).status_code == 200
+    assert _log(uid) == []
+    tokens.clear()
+    sync.sync_user(uid)
+    assert ("familie@x.dk", None) in tokens         # read from the start
+    assert _log(uid) == ["Fødselsdag"]
+    assert [c["id"] for c in _page(client)["calendars"] if c["toLog"]] == ["familie@x.dk"]
+
+
+def test_picking_the_same_calendar_changes_nothing(client, monkeypatch):
+    from app.sections.calendar import sync
+    uid, tokens = _connected(client, monkeypatch, {"mig@x.dk": [_event("a", "Mit møde")]})
+    sync.sync_user(uid)
+    client.put("/api/s/calendar/log-calendar", json={"calendarId": "mig@x.dk"})
+    assert _log(uid) == ["Mit møde"]
+    tokens.clear()
+    sync.sync_user(uid)
+    assert ("mig@x.dk", "tok") in tokens
+
+
+def test_a_calendar_that_does_not_exist_cannot_take_the_log(client, monkeypatch):
+    from app.sections.calendar import sync
+    uid, _tokens = _connected(client, monkeypatch, {"mig@x.dk": [_event("a", "Mit møde")]})
+    sync.sync_user(uid)
+    assert client.put("/api/s/calendar/log-calendar", json={"calendarId": "andet"}).status_code == 404
+    assert _log(uid) == ["Mit møde"]
+
+
+def test_the_move_to_one_calendar_cleans_the_log(client):
+    """What migration 2 does on a database from before: only the primary's rows stay,
+    a person's own entries are not touched, and everything is fetched again."""
+    from app.core import db, vault
+    from app.sections.calendar import sync
+    from app.sections.logmylife import store
+    uid = _me(client)
+    with db.connect() as con:
+        con.execute("INSERT INTO google_accounts (user_id, email, refresh_token, connected_at) VALUES (?,?,?,?)",
+                    (uid, "mig@x.dk", vault.seal("refresh"), db.utcnow()))
+        con.executemany("INSERT INTO google_calendars (user_id, calendar_id, sync_token) VALUES (?,?,?)",
+                        [(uid, "mig@x.dk", "tok"), (uid, "familie@x.dk", "tok")])
+    for sid, title in (("mig@x.dk|a", "Mit møde"), ("familie@x.dk|b", "Fødselsdag")):
+        store.ingest(uid, "google", sid, title=title, start="2020-05-05", all_day=True)
+    store.add(uid, {"title": "Eget indlæg", "start": "2020-05-06"})
+    with db.connect() as con:
+        sync.migrate_2(con)
+    assert sorted(_log(uid)) == ["Eget indlæg", "Mit møde"]
+    assert [(c["id"], c["toLog"]) for c in sync.calendars_of(uid)] == [("familie@x.dk", False), ("mig@x.dk", True)]
+    with db.connect() as con:
+        assert {r["sync_token"] for r in con.execute("SELECT sync_token FROM google_calendars").fetchall()} == {None}
+
+
+def test_disconnecting_removes_the_copy_and_keeps_the_log(client, monkeypatch):
+    from app.core import db
+    from app.sections.calendar import sync
+    uid, _tokens = _connected(client, monkeypatch, {"mig@x.dk": [_event("a", "Mit møde")]})
+    sync.sync_user(uid)
+    client.post("/api/s/calendar/disconnect")
+    with db.connect() as con:
+        assert con.execute("SELECT COUNT(*) FROM google_events").fetchone()[0] == 0
+    assert _log(uid) == ["Mit møde"]

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { clock, cap, kr, one, shortDay } from '../core/format'
-import type { CalendarBlock, DkLive, F1Block, HourWeather, LifeEvent, PricePoint } from '../core/types'
+import { cap, clock, inkOn, kr, one, shortDay } from '../core/format'
+import type { CalendarBlock, CalendarEvent, DkLive, F1Block, HourWeather, PricePoint } from '../core/types'
 
 // Dagsbåndet: one time axis for everything on the day, like the channels of a
 // scope. Elpris, vejr and the calendar line up under one cursor; hover (or the
@@ -18,20 +18,21 @@ interface Block {
   title: string
   kind: 'event' | 'allday' | 'f1'
   lane: number
+  color?: string
 }
 
 const ms = (iso: string) => new Date(iso).getTime()
 
-function blocksFrom(events: LifeEvent[], f1: F1Block | undefined, from: number, to: number): Block[] {
+function blocksFrom(events: CalendarEvent[], f1: F1Block | undefined, from: number, to: number): Block[] {
   const raw: Omit<Block, 'lane'>[] = []
   for (const e of events) {
     if (e.allDay) {
       const [y, m, d] = e.day.split('-').map(Number)
       const last = (e.end ?? e.day).split('-').map(Number)
-      raw.push({ start: new Date(y, m - 1, d).getTime(), end: new Date(last[0], last[1] - 1, last[2] + 1).getTime(), title: e.title, kind: 'allday' })
+      raw.push({ start: new Date(y, m - 1, d).getTime(), end: new Date(last[0], last[1] - 1, last[2] + 1).getTime(), title: e.title, kind: 'allday', color: e.color })
     } else {
       const start = ms(e.start)
-      raw.push({ start, end: e.end ? ms(e.end) : start + HOUR, title: e.title, kind: 'event' })
+      raw.push({ start, end: e.end ? ms(e.end) : start + HOUR, title: e.title, kind: 'event', color: e.color })
     }
   }
   for (const s of f1?.sessions ?? []) {
@@ -215,8 +216,10 @@ export function DayBand({ now, dk, calendar, f1 }: Props) {
           const beside = inside ? '' : fit(b.title, room)
           return (
             <g key={i}>
-              <rect x={left} y={y} width={Math.max(3, right - left - 2)} height={22} rx={3} className={`band-block ${b.kind}`} />
-              {inside && <text x={left + 6} y={y + 15} className={`band-block-text ${b.kind}`}>{inside}</text>}
+              <rect x={left} y={y} width={Math.max(3, right - left - 2)} height={22} rx={3} className={`band-block ${b.kind}`}
+                style={b.color ? { fill: b.color, fillOpacity: b.kind === 'allday' ? 0.5 : 1 } : undefined} />
+              {inside && <text x={left + 6} y={y + 15} className={`band-block-text ${b.kind}`}
+                style={b.color && b.kind === 'event' ? { fill: inkOn(b.color) } : undefined}>{inside}</text>}
               {beside && <text x={right + 4} y={y + 15} className="band-block-text beside">{beside}</text>}
             </g>
           )

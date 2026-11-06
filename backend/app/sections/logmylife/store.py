@@ -74,6 +74,14 @@ def _dto(r, me_id: int | None = None) -> dict:
 
 # ---- what other sections call --------------------------------------------------
 
+def when(start: str, end: str | None, all_day: bool) -> tuple[str, str | None, str]:
+    """A source's times as they are stored: start, end, and the local day."""
+    start = start if all_day else _utc_iso(start)
+    if end:
+        end = end if all_day else _utc_iso(end)
+    return start, end, _day_of(start, all_day)
+
+
 def ingest(user_id: int, source: str, source_id: str, *, title: str, start: str,
            end: str | None = None, all_day: bool = False, description: str = "",
            location: str = "", category: str = "", raw: dict | None = None) -> str:
@@ -81,10 +89,7 @@ def ingest(user_id: int, source: str, source_id: str, *, title: str, start: str,
     (user, source, source_id) updates the row instead of adding a new one, and
     a row that was marked deleted comes back when the source has it again.
     Returns 'added', 'updated' or 'same'."""
-    start = start if all_day else _utc_iso(start)
-    if end:
-        end = end if all_day else _utc_iso(end)
-    day = _day_of(start, all_day)
+    start, end, day = when(start, end, all_day)
     now = db.utcnow()
     blob = json.dumps(raw, ensure_ascii=False) if raw is not None else None
     with db.connect() as con:
@@ -122,6 +127,14 @@ def mark_deleted(user_id: int, source: str, source_id: str) -> bool:
             " WHERE user_id=? AND source=? AND source_id=? AND deleted_at_source IS NULL",
             (db.utcnow(), db.utcnow(), user_id, source, source_id))
         return cur.rowcount > 0
+
+
+def forget(user_id: int, source: str, prefix: str) -> int:
+    """Take the rows whose source id starts with `prefix` out of the log. The one
+    exception to the log remembering: the person moved it to another calendar."""
+    with db.connect() as con:
+        return con.execute("DELETE FROM life_events WHERE user_id=? AND source=? AND substr(source_id, 1, ?)=?",
+                           (user_id, source, len(prefix), prefix)).rowcount
 
 
 # ---- entries by hand ------------------------------------------------------------
@@ -256,25 +269,6 @@ def on_this_day(user_id: int, day: str | None = None, limit: int = 6) -> list[di
             " ORDER BY e.day DESC LIMIT ?",
             (day[5:], day[:4] + "-01-01", user_id, limit)).fetchall()
     return [_dto(r, user_id) for r in rows]
-
-
-def upcoming(user_id: int, days: int = 14, limit: int = 200) -> list[dict]:
-    """Coming calendar events: not cancelled, starting from today."""
-    start = today()
-    end = (date.fromisoformat(start) + timedelta(days=days)).isoformat()
-    with db.connect() as con:
-        rows = con.execute(
-            "SELECT * FROM life_events WHERE user_id=? AND source='google'"
-            " AND deleted_at_source IS NULL AND day >= ? AND day <= ?"
-            " ORDER BY start_at, id LIMIT ?", (user_id, start, end, limit)).fetchall()
-    now = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
-    out = []
-    for r in rows:
-        ends = r["end_at"] or r["start_at"]
-        if not r["all_day"] and ends < now:
-            continue                                # already over today
-        out.append(_dto(r, user_id))
-    return out
 
 
 def stats(user_id: int) -> dict:

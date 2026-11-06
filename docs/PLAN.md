@@ -13,7 +13,7 @@ Last updated 2026-11-06. Read this before changing anything.
 | F1 | Only the calendar of coming practice, qualifying and race. Nothing live |
 | DK live | Live on the overview: power prices, traffic and updates |
 | LogMyLife | Was never really built, so it is developed here |
-| LogMyLife remembers | All calendar events, entries from other sections, own entries |
+| LogMyLife remembers | One calendar, entries from other sections, own entries. Changed on 2026-11-06: at first all calendars, now only the main one, which is Google's primary until the person picks another |
 | LogMyLife ↔ Google | Google to the log only. Nothing is written to Google |
 | LogMyLife, who | Each person has their own and their own Google connection, and can share entries |
 | Admin | Family user control, and all setup of APIs is done there |
@@ -42,7 +42,7 @@ section registry, `update.sh`), same as SLQ Hub and FamilyLog.
 | Overview | Works. Date, clock, a sentence built from the data, Dagsbåndet, a block per section |
 | Ping indicator | Works. Browser → server round trip, page load; server → Cloudflare, Google, dk-live, FamilyLog by TCP connect; load average |
 | Admin | Works. Users, roles, sections per user, passwords, sign out, setup of everything, lists of printers and cameras |
-| Kalender | Works against the mock. Not yet run against real Google, no client exists yet |
+| Kalender | Works, run against real Google. Every ticked calendar in Google's colours, the main one also goes to LogMyLife |
 | DK live | Works, run against a real dk-live |
 | Nyheder | Works, run against real DR and TV 2 feeds |
 | LogMyLife | Timeline, own entries, sharing, on this day, Google and FamilyLog ingest, Strava export import. No photos yet |
@@ -73,10 +73,11 @@ section registry, `update.sh`), same as SLQ Hub and FamilyLog.
   Docker daemon and no Proxmox where this was built. `tools/container.py` is
   FamilyLog's, renamed. Søren made CT 109 himself (2 cores, 2 GB, about 60 GB), and
   `docs/PROXMOX.md` has the steps for a container that already exists.
-- Real Google OAuth. The whole flow ran against `tools/mock_upstreams.py` only. Google's
-  app is External and must be published, which needs home, privacy and terms links on
+- Google's app is External and published, which needs home, privacy and terms links on
   Branding (`frontend/public/privacy.html`, public, serves for both) and no logo: a
-  logo would mean verification.
+  logo would mean verification. The API answers in Google's classic palette, so
+  `core/google.py` maps to the modern one. Someone who chose classic in Google's own
+  settings sees other shades than here.
 - Real Bambu printers. Field names and the 5-minute rule are from OpenBambuAPI. Firmware
   since early 2025 restricts third-party control; monitoring is reported to work, and
   some setups may need LAN mode or Developer Mode.

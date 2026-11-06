@@ -24,12 +24,24 @@ export interface LifeEvent {
   owner: string | null
 }
 
+export interface CalendarEvent {
+  id: string
+  title: string
+  start: string
+  end: string | null
+  allDay: boolean
+  day: string
+  location: string
+  color: string
+  calendar: string
+}
+
 export interface CalendarBlock {
   configured: boolean
   connected: boolean
   status: string
   email: string
-  events: LifeEvent[]
+  events: CalendarEvent[]
 }
 
 export interface PricePoint {

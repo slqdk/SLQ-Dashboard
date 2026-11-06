@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { ago, dayKey, dayName, duration, kr, localDate, since, units, until } from './format'
+import { ago, dayKey, dayName, duration, inkOn, kr, localDate, since, units, until } from './format'
 
 const now = new Date(2026, 10, 6, 7, 15) // Friday 6 November
+
+describe('inkOn', () => {
+  it('picks what reads on a colour', () => {
+    expect(inkOn('#f6bf26')).toBe('#0b1720')   // Banana
+    expect(inkOn('#d50000')).toBe('#ffffff')   // Tomato
+    expect(inkOn('#3f51b5')).toBe('#ffffff')   // Blueberry
+  })
+})
 
 describe('units', () => {
   it('keeps fractions and drops empty decimals', () => {

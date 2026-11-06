@@ -28,7 +28,9 @@ Proxmox LXC. **Read `docs/PLAN.md` first: decisions, what is built, what is open
   passes the dashboard's login. Pass on an httpx error's type, never its text.
 - **LogMyLife remembers.** Nothing from a source is deleted: a row deleted at the
   source gets `deleted_at_source`. Sections add to the log through `store.ingest`,
-  which is safe to repeat.
+  which is safe to repeat. One calendar per person feeds it; the rest stay in
+  `google_events` for the page. Moving the log to another calendar is the one thing
+  that removes rows, and the page asks first.
 - **`overview()` never calls an upstream.** It reads the database or a job's cache,
   so the page always answers at once.
 - **No secrets to the browser or the log.** Settings secrets go through
