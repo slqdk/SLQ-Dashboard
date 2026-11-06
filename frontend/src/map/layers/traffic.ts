@@ -2,6 +2,7 @@
 import { empty, Live, point } from '../live'
 import { cap, esc, rows, stamp } from '../text'
 import type { TrafficEvent } from '../types'
+import { labelPaint } from '../theme'
 
 const POLL_MS = 60_000
 const COLORS: Record<string, string> = {
@@ -40,7 +41,7 @@ export function addTraffic(live: Live): void {
       'text-optional': true,
       'symbol-sort-key': ['case', ['get', 'blocking'], 0, 1],
     },
-    paint: { 'text-color': ['get', 'color'], 'text-halo-color': '#0b1720', 'text-halo-width': 1.3 },
+    paint: { ...labelPaint(['get', 'color'], 1.3) },
   })
 
   live.onClick('traffic-hit', (e) => {

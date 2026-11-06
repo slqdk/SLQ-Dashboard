@@ -150,8 +150,8 @@ export default function LiveMap({ layers, free }: { layers: string[]; free: RefO
     if (free.current) watcher.observe(free.current)
     place()
 
+    map.once('style.load', () => applyTheme(map))       // before anything is drawn in the style's own black
     map.on('load', () => {
-      applyTheme(map)
       const on = new Set(wanted.split(','))
       for (const [id, add] of LAYERS) if (on.has(id)) add(live)
     })

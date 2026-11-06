@@ -3,6 +3,7 @@
 import { empty, Live, point, shapeIcon } from '../live'
 import { esc, link, webAddress } from '../text'
 import type { Webcam } from '../types'
+import { labelPaint } from '../theme'
 
 const POLL_MS = 15 * 60_000
 const COLOR: Record<Webcam['source'], string> = { autobahn: '#b58cff', windy: '#e0a3ff', egen: '#ffd24a' }
@@ -62,7 +63,7 @@ export function addWebcams(live: Live): void {
       'text-optional': true,
       'symbol-sort-key': ['match', ['get', 'source'], 'egen', 0, 'windy', 1, 2],
     },
-    paint: { 'text-color': ['get', 'color'], 'text-halo-color': '#0b1720', 'text-halo-width': 1.2 },
+    paint: { ...labelPaint(['get', 'color'], 1.2) },
   })
   live.add({ id: 'webcams-hit', type: 'circle', source: 'webcams', paint: { 'circle-radius': 16, 'circle-opacity': 0, 'circle-stroke-opacity': 0 } })
 

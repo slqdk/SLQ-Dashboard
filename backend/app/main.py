@@ -131,6 +131,19 @@ def auth_logout(request: Request, response: Response):
     return {"ok": True}
 
 
+class ThemeBody(BaseModel):
+    theme: str
+
+
+@app.patch("/api/me/theme")
+def my_theme(body: ThemeBody, request: Request):
+    try:
+        auth.set_theme(request.state.user["id"], body.theme)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    return {"ok": True}
+
+
 @app.patch("/api/me/password")
 def my_password(body: PasswordBody, request: Request):
     try:

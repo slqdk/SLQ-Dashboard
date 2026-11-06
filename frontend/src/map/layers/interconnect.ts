@@ -2,6 +2,7 @@
  *  on Storebælt into DK1. The lines are schematic: a stub out to sea, never across land. */
 import { empty, Live, point, sdfIcon } from '../live'
 import { esc, rows } from '../text'
+import { labelPaint } from '../theme'
 
 const POLL_MS = 120_000
 type Spot = [number, number]
@@ -66,7 +67,7 @@ export function addInterconnect(live: Live): void {
       'text-anchor': 'top',
       'text-allow-overlap': true,
     },
-    paint: { 'icon-color': COLOR, 'text-color': COLOR, 'text-halo-color': '#0b1720', 'text-halo-width': 1.2 },
+    paint: { 'icon-color': COLOR, ...labelPaint(COLOR, 1.2) },
   })
 
   live.onClick('ic-arrow', (e) => {

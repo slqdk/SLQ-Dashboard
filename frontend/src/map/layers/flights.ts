@@ -4,6 +4,7 @@ import { model, metres, secondLabel, CATEGORY } from '../aircraft'
 import { empty, Live, plane, point, shapeIcon } from '../live'
 import { esc, rows, type Row } from '../text'
 import type { Aircraft } from '../types'
+import { labelPaint } from '../theme'
 
 const POLL_MS = 10_000
 const MOST_AHEAD_S = 90             // an aircraft quiet for this long stops moving
@@ -75,9 +76,7 @@ export function addFlights(live: Live, military: boolean): void {
     },
     paint: {
       'icon-opacity': ['case', ['get', 'onGround'], 0.5, 1],
-      'text-color': color,
-      'text-halo-color': '#0b1720',
-      'text-halo-width': 1.2,
+      ...labelPaint(color, 1.2),
     },
   })
 

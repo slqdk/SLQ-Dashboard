@@ -3,6 +3,7 @@ export interface User {
   username: string
   role: 'admin' | 'family'
   name: string
+  theme: string
   sections: string[]
 }
 

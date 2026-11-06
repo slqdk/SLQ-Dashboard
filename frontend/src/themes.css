@@ -1,0 +1,619 @@
+/* The themes. A theme is colours and system fonts on the tokens in styles.css, and a few
+   rules here for what makes it look like itself: a title bar, a bevel, a menu bar. Nothing
+   in it is taken from the systems it recalls but the look, and no picture or logo is used.
+   Chart colours are checked per theme with the palette validator, on the theme's surface. */
+
+/* ---- Shared: a panel with a title has a title bar ---- */
+:root[data-theme]:not([data-theme='dark']) .block { padding-top: 0; }
+:root[data-theme]:not([data-theme='dark']) .block > h2,
+:root[data-theme]:not([data-theme='dark']) legend,
+:root[data-theme]:not([data-theme='dark']) dialog > h2 {
+  display: block;
+  background: var(--title);
+  color: var(--title-ink);
+  font: var(--title-weight) var(--title-size)/1.3 var(--title-face, var(--text));
+  letter-spacing: 0;
+  text-shadow: var(--title-shadow, none);
+  box-shadow: var(--title-lift, none);
+  border-radius: var(--title-radius, 0);
+}
+:root[data-theme]:not([data-theme='dark']) .block > h2 { margin: var(--title-outset, 0 -14px) 8px; padding: 3px 8px; }
+:root[data-theme]:not([data-theme='dark']) legend { width: calc(100% + 36px); margin: -12px -18px 8px; padding: 3px 8px; }
+:root[data-theme]:not([data-theme='dark']) dialog > h2 { margin: -18px -20px 12px; padding: 4px 10px; }
+
+/* ---- Windows 7 ---- */
+:root[data-theme='win7'] {
+  --ground: #2f6ea8;
+  --page: #f3f6fa;
+  --panel: #ffffff;
+  --raised: #eaf1f8;
+  --screen: #ffffff;
+  --rule: #c5d3e0;
+  --paper: #1b2733;
+  --mute: #48596a;
+  --faint: #76899b;
+  --heading: #003399;
+  --accent: #2f7fd6;
+  --glass: rgba(255, 255, 255, .97);
+  --dialog: #f6f9fc;
+  --backdrop: rgba(20, 40, 60, .35);
+
+  --price: #0c8571;
+  --temp: #ad6a00;
+  --rain: #1d6fd0;
+  --f1: #d33a2e;
+  --cal: #6b86a3;
+  --good: #1f8f58;
+  --slow: #b57b00;
+  --bad: #d13438;
+  --danger: #b3261e;
+  --danger-rule: #b3261e;
+  --problem: #b3261e;
+  --kind-112: #b3261e;
+  --kind-trafik: #8a5a00;
+  --kind-politi: #1a56a8;
+
+  --text: 'Segoe UI', Tahoma, 'Noto Sans', 'DejaVu Sans', sans-serif;
+  --cond: var(--text);
+  --size: 14px;
+  --fit: .68;
+
+  --radius: 6px;
+  --radius-small: 3px;
+  --box: 1px solid #8fa8c0;
+  --box-lift: 0 1px 4px rgba(20, 40, 60, .25);
+  --window: 1px solid #5d7c9a;
+  --window-lift: 0 0 0 3px rgba(198, 221, 244, .78), 0 3px 10px rgba(10, 30, 50, .4);
+  --window-radius: 6px;
+  --dialog-edge: var(--window);
+  --band-edge: var(--box);
+
+  --title: linear-gradient(#eaf3fb, #d3e3f3 49%, #bdd4ec 50%, #d6e6f6);
+  --title-ink: #0f2a47;
+  --title-size: 14px;
+  --title-weight: 600;
+  --title-radius: 5px 5px 0 0;
+  --title-lift: inset 0 1px rgba(255, 255, 255, .8), 0 1px #9db4cb;
+  --title-outset: 0 -14px;
+
+  --nav: linear-gradient(#4f7396, #2c4d6f 49%, #1d3a57 50%, #2b4e70);
+  --nav-ink: #dbe7f2;
+  --nav-strong: #ffffff;
+  --nav-rule: #14283c;
+  --nav-pad: 6px 8px;
+  --nav-gap: 2px;
+  --nav-on: linear-gradient(rgba(255, 255, 255, .42), rgba(255, 255, 255, .14) 49%, rgba(255, 255, 255, .06) 50%, rgba(255, 255, 255, .2));
+  --nav-on-ink: #ffffff;
+  --nav-on-radius: 3px;
+  --nav-on-lift: inset 0 0 0 1px rgba(255, 255, 255, .45), 0 0 6px rgba(160, 210, 255, .6);
+  --nav-mark: transparent;
+
+  --button: linear-gradient(#f4f4f4, #ebebeb 49%, #dddddd 50%, #cfcfcf);
+  --button-ink: #1b2733;
+  --button-rule: #707070;
+  --button-lift: inset 0 0 0 1px rgba(255, 255, 255, .7);
+  --hover: linear-gradient(#ecf7fd, #dcf1fc 49%, #bfe6fd 50%, #a8daf5);
+  --hover-rule: #3c7fb1;
+  --hover-lift: inset 0 0 0 1px rgba(255, 255, 255, .7);
+  --press: linear-gradient(#dcebf4, #c4e4f6 49%, #98d1ef 50%, #68b3db);
+  --press-lift: inset 0 1px 2px rgba(0, 40, 80, .35);
+  --primary: linear-gradient(#f4f4f4, #ebebeb 49%, #dddddd 50%, #cfcfcf);
+  --primary-ink: #1b2733;
+  --primary-rule: #2f7fd6;
+  --primary-lift: inset 0 0 0 1px #8fc7f5;
+  --on: linear-gradient(#dcebf4, #c4e4f6 49%, #98d1ef 50%, #8cc8e8);
+  --on-ink: #1b2733;
+  --on-rule: #2c628b;
+  --on-lift: inset 0 1px 2px rgba(0, 40, 80, .3);
+  --field: #ffffff;
+  --field-ink: #1b2733;
+  --field-rule: #abadb3;
+
+  --night: #dde6ef;
+  --grid: #e7edf3;
+  --grid-strong: #c6d3df;
+  --band-rule: #d6e0ea;
+  --allday: #dce6f0;
+  --block-ink: #ffffff;
+
+  --map-land: #eef2ea;
+  --map-water: #a9cfee;
+  --map-green: #d8e8cc;
+  --map-town: #e3e6e2;
+  --map-border: #8a96a0;
+  --map-motorway: #aebcc8;
+  --map-main: #c5ced6;
+  --map-road: #d9dfe3;
+  --map-rail: #a8b2ba;
+  --map-casing: #c9d2d9;
+  --map-label: #25323e;
+  --map-halo: #ffffff;
+  --map-ink: #1b2733;
+  --map-icons: none;
+  color-scheme: light;
+}
+
+/* ---- Windows XP ---- */
+:root[data-theme='winxp'] {
+  --ground: #3a6ea5;
+  --page: #ece9d8;
+  --panel: #f7f6ef;
+  --raised: #ffffff;
+  --screen: #ffffff;
+  --rule: #aca899;
+  --paper: #000000;
+  --mute: #45433a;
+  --faint: #7c7968;
+  --heading: #0a3bb0;
+  --accent: #2f71cd;
+  --focus: #0a3bb0;
+  --glass: #ece9d8;
+  --dialog: #ece9d8;
+  --backdrop: rgba(0, 0, 40, .3);
+
+  --price: #0a7c5c;
+  --temp: #a65e00;
+  --rain: #1b63c9;
+  --f1: #c9301f;
+  --cal: #5e7ea6;
+  --good: #1d8a3a;
+  --slow: #b37400;
+  --bad: #c9301f;
+  --danger: #a51c0f;
+  --danger-rule: #a51c0f;
+  --problem: #a51c0f;
+  --kind-112: #a51c0f;
+  --kind-trafik: #7c5200;
+  --kind-politi: #123fa0;
+
+  --text: Tahoma, 'Segoe UI', Verdana, 'DejaVu Sans', sans-serif;
+  --cond: var(--text);
+  --size: 13.5px;
+  --fit: .62;
+
+  --radius: 3px;
+  --radius-small: 3px;
+  --box: 1px solid #aca899;
+  --box-lift: 1px 1px 2px rgba(60, 50, 20, .25);
+  --window: 3px solid #0d55e4;
+  --window-lift: 1px 2px 6px rgba(0, 0, 30, .45);
+  --window-radius: 8px 8px 2px 2px;
+  --dialog-edge: 3px solid #0d55e4;
+  --band-edge: var(--box);
+
+  --title: linear-gradient(#0997ff, #0053ee 8%, #0050ee 40%, #0066ff 88%, #0066ff 93%, #005bff 95%, #003dd7 96%, #003dd7);
+  --title-ink: #ffffff;
+  --title-face: 'Trebuchet MS', Tahoma, 'DejaVu Sans', sans-serif;
+  --title-size: 13.5px;
+  --title-weight: 700;
+  --title-shadow: 1px 1px 1px #0f1089;
+  --title-radius: 5px 5px 0 0;
+  --title-outset: 0 -14px;
+
+  --nav: linear-gradient(#1f2f86, #3165c4 3%, #3682e5 6%, #4490e6 10%, #3883e5 12%, #2b71e0 15%, #2663da 18%, #235bd6 20%, #2258d5 23%, #2157d6 38%, #245ddb 54%, #2562df 86%, #245fdc 89%, #2158d4 92%, #1d4ec0 95%, #1941a5 98%);
+  --nav-ink: #ffffff;
+  --nav-strong: #ffffff;
+  --nav-rule: #1941a5;
+  --nav-pad: 6px 8px;
+  --nav-gap: 2px;
+  --nav-on: #1e52b7;
+  --nav-on-ink: #ffffff;
+  --nav-on-radius: 3px;
+  --nav-on-lift: inset 1px 1px 2px rgba(0, 0, 40, .55), inset -1px -1px 1px rgba(255, 255, 255, .15);
+  --nav-mark: transparent;
+
+  --button: linear-gradient(#ffffff, #ecebe5 86%, #d8d0c4);
+  --button-ink: #000000;
+  --button-rule: #003c74;
+  --button-radius: 3px;
+  --hover: linear-gradient(#ffffff, #ecebe5 86%, #d8d0c4);
+  --hover-rule: #003c74;
+  --hover-lift: inset -1px 1px #fff0cf, inset 1px 2px #fdd889, inset -2px 2px #fbc761, inset 2px -2px #e5a01a;
+  --press: linear-gradient(#cdcac3, #e3e3db 8%, #e5e4dd 90%, #efeee7);
+  --press-lift: none;
+  --primary: linear-gradient(#ffffff, #ecebe5 86%, #d8d0c4);
+  --primary-ink: #000000;
+  --primary-rule: #003c74;
+  --primary-lift: inset -1px 1px #cee7ff, inset 1px 2px #98b8ea, inset -2px 2px #bcd4f6, inset 1px -1px #89ade4, inset 2px -2px #89ade4;
+  --on: linear-gradient(#cdcac3, #e3e3db 8%, #e5e4dd 90%, #efeee7);
+  --on-ink: #000000;
+  --on-rule: #003c74;
+  --field: #ffffff;
+  --field-ink: #000000;
+  --field-rule: #7f9db9;
+
+  --night: #dcd9c8;
+  --grid: #e8e6da;
+  --grid-strong: #c4c0ae;
+  --band-rule: #d6d3c3;
+  --allday: #e4e1d0;
+  --block-ink: #ffffff;
+
+  --map-land: #efecdd;
+  --map-water: #9dbfe8;
+  --map-green: #cfdcb0;
+  --map-town: #e4e0cf;
+  --map-border: #8d8a78;
+  --map-motorway: #b5b09a;
+  --map-main: #c9c5b1;
+  --map-road: #dcd8c6;
+  --map-rail: #aca899;
+  --map-casing: #cfcbb9;
+  --map-label: #222222;
+  --map-halo: #ffffff;
+  --map-ink: #000000;
+  --map-icons: none;
+  color-scheme: light;
+}
+
+/* ---- Windows 2000 ---- */
+:root[data-theme='win2k'] {
+  --ground: #3a6ea5;
+  --page: #d4d0c8;
+  --panel: #d4d0c8;
+  --raised: #e6e3dc;
+  --screen: #ffffff;
+  --rule: #808080;
+  --paper: #000000;
+  --mute: #3c3c3c;
+  --faint: #6c6c6c;
+  --accent: #0a246a;
+  --focus: #000000;
+  --glass: #d4d0c8;
+  --dialog: #d4d0c8;
+  --backdrop: rgba(0, 0, 0, .25);
+
+  --price: #008570;
+  --temp: #8f5e00;
+  --rain: #0a50c0;
+  --f1: #c00000;
+  --cal: #0a246a;
+  --good: #007a00;
+  --slow: #8f5e00;
+  --bad: #c00000;
+  --danger: #800000;
+  --danger-rule: #800000;
+  --problem: #800000;
+  --kind-112: #800000;
+  --kind-trafik: #6b4a00;
+  --kind-politi: #000080;
+
+  --text: Tahoma, 'Segoe UI', Verdana, 'DejaVu Sans', sans-serif;
+  --cond: var(--text);
+  --size: 13.5px;
+  --fit: .62;
+
+  --radius: 0;
+  --radius-small: 0;
+  --bevel: inset -1px -1px #404040, inset 1px 1px #ffffff, inset -2px -2px #808080, inset 2px 2px #d4d0c8;
+  --sunken: inset -1px -1px #ffffff, inset 1px 1px #808080, inset -2px -2px #d4d0c8, inset 2px 2px #404040;
+  --box: 2px solid transparent;
+  --box-lift: var(--bevel);
+  --window: 3px solid transparent;
+  --window-lift: var(--bevel);
+  --window-radius: 0;
+  --dialog-edge: 3px solid transparent;
+  --band-edge: 2px solid transparent;
+
+  --title: linear-gradient(90deg, #0a246a, #a6caf0);
+  --title-ink: #ffffff;
+  --title-size: 13px;
+  --title-weight: 700;
+  --title-outset: 0 -14px;
+
+  --nav: #d4d0c8;
+  --nav-ink: #000000;
+  --nav-strong: #000000;
+  --nav-rule: #808080;
+  --nav-lift: inset 0 1px #ffffff;
+  --nav-pad: 5px 8px;
+  --nav-gap: 2px;
+  --nav-on: #d4d0c8;
+  --nav-on-ink: #000000;
+  --nav-on-lift: inset -1px -1px #ffffff, inset 1px 1px #808080;
+  --nav-mark: transparent;
+
+  --button: #d4d0c8;
+  --button-ink: #000000;
+  --button-rule: transparent;
+  --button-lift: var(--bevel);
+  --hover: #d4d0c8;
+  --hover-rule: transparent;
+  --hover-lift: var(--bevel);
+  --press: #d4d0c8;
+  --press-lift: var(--sunken);
+  --primary: #d4d0c8;
+  --primary-ink: #000000;
+  --primary-rule: #000000;
+  --primary-lift: var(--bevel);
+  --on: #e6e3dc;
+  --on-ink: #000000;
+  --on-rule: transparent;
+  --on-lift: var(--sunken);
+  --field: #ffffff;
+  --field-ink: #000000;
+  --field-rule: transparent;
+  --field-lift: var(--sunken);
+
+  --night: #e4e4e4;
+  --grid: #e0e0e0;
+  --grid-strong: #b0b0b0;
+  --band-rule: #c8c8c8;
+  --allday: #d4d0c8;
+  --block-ink: #ffffff;
+
+  --map-land: #d4d0c8;
+  --map-water: #3a6ea5;
+  --map-green: #c4c8b4;
+  --map-town: #c8c4bc;
+  --map-border: #404040;
+  --map-motorway: #808080;
+  --map-main: #9a9a94;
+  --map-road: #b4b1a9;
+  --map-rail: #808080;
+  --map-casing: #a8a59e;
+  --map-label: #000000;
+  --map-halo: #d4d0c8;
+  --map-ink: #000000;
+  --map-icons: none;
+  color-scheme: light;
+}
+:root[data-theme='win2k'] .maplibregl-ctrl-group { background: #d4d0c8; box-shadow: var(--bevel); border-radius: 0; }
+:root[data-theme='win2k'] .nav nav a:hover { background: #0a246a; color: #ffffff; }
+:root[data-theme='win2k'] .nav nav a[aria-current='page']:hover { background: #d4d0c8; color: #000000; }
+
+/* ---- Visual Studio 2017 ---- */
+:root[data-theme^='vs'] {
+  --text: 'Segoe UI', Tahoma, 'Noto Sans', 'DejaVu Sans', sans-serif;
+  --cond: var(--text);
+  --size: 14px;
+  --fit: .68;
+  --radius: 0;
+  --radius-small: 0;
+  --window-radius: 0;
+  --title-size: 13px;
+  --title-weight: 400;
+  --title-outset: 0 -14px;
+  --band-edge: var(--box);
+  --dialog-edge: var(--window);
+  --nav-pad: 6px 8px;
+  --nav-gap: 2px;
+  --nav-mark: transparent;
+  --nav-lift: inset 0 -2px #007acc;
+  --nav-rule: #007acc;
+  --primary: #007acc;
+  --primary-ink: #ffffff;
+  --primary-rule: #007acc;
+  --on: #007acc;
+  --on-ink: #ffffff;
+  --on-rule: #007acc;
+  --accent: #007acc;
+  --focus: #007acc;
+}
+
+:root[data-theme='vs-blue'] {
+  --ground: #293955;
+  --page: #f5f6fa;
+  --panel: #ffffff;
+  --raised: #eef0f6;
+  --screen: #ffffff;
+  --rule: #ccd2e0;
+  --paper: #1b293e;
+  --mute: #46536a;
+  --faint: #76849c;
+  --glass: rgba(255, 255, 255, .97);
+  --dialog: #f5f6fa;
+  --backdrop: rgba(20, 30, 50, .45);
+
+  --price: #008a70;
+  --temp: #a76200;
+  --rain: #1a69c7;
+  --f1: #cc3126;
+  --cal: #4d6082;
+  --good: #1f8f58;
+  --slow: #a97400;
+  --bad: #cc3126;
+  --danger: #b3261e;
+  --danger-rule: #b3261e;
+  --problem: #b3261e;
+  --kind-112: #b3261e;
+  --kind-trafik: #7f5500;
+  --kind-politi: #1a56a8;
+
+  --box: 1px solid #b6bfd2;
+  --box-lift: none;
+  --window: 1px solid #4d6082;
+  --title: #4d6082;
+  --title-ink: #ffffff;
+
+  --nav: #d6dbe9;
+  --nav-ink: #1b293e;
+  --nav-strong: #000000;
+  --nav-on: #fff29d;
+  --nav-on-ink: #000000;
+
+  --button: #eef0f6;
+  --button-ink: #1b293e;
+  --button-rule: #b6bfd2;
+  --hover: #fff29d;
+  --hover-rule: #e5c365;
+  --press: #ffe8a6;
+  --field: #ffffff;
+  --field-ink: #1b293e;
+  --field-rule: #b6bfd2;
+
+  --night: #e4e8f1;
+  --grid: #ebeef4;
+  --grid-strong: #c6cddc;
+  --band-rule: #d8dde8;
+  --allday: #e1e5ee;
+  --block-ink: #ffffff;
+
+  --map-land: #e9edf5;
+  --map-water: #b7c6de;
+  --map-green: #d8e3da;
+  --map-town: #dfe3ec;
+  --map-border: #6d7d99;
+  --map-motorway: #9aa8c0;
+  --map-main: #b4bfd2;
+  --map-road: #cdd5e2;
+  --map-rail: #9aa8c0;
+  --map-casing: #c3ccdb;
+  --map-label: #1b293e;
+  --map-halo: #ffffff;
+  --map-ink: #1b293e;
+  --map-icons: none;
+  color-scheme: light;
+}
+/* The tool window one is in has the yellow title, as the active one does in the IDE. */
+:root[data-theme='vs-blue'] .block:hover > h2,
+:root[data-theme='vs-blue'] .block:focus-within > h2 { background: #fff29d; color: #000000; }
+
+:root[data-theme='vs-dark'] {
+  --ground: #2d2d30;
+  --page: #1e1e1e;
+  --panel: #252526;
+  --raised: #333337;
+  --screen: #1e1e1e;
+  --rule: #3f3f46;
+  --paper: #f1f1f1;
+  --mute: #b8b8b8;
+  --faint: #868686;
+  --glass: rgba(37, 37, 38, .94);
+  --dialog: #2d2d30;
+  --backdrop: rgba(0, 0, 0, .55);
+
+  --price: #2bab93;
+  --temp: #bb8825;
+  --rain: #4a96db;
+  --f1: #e4574c;
+  --cal: #c8c8c8;
+  --good: #4ec98a;
+  --slow: #d7ba7d;
+  --bad: #f14c4c;
+  --danger: #f48771;
+  --danger-rule: #8c3a31;
+  --problem: #f48771;
+  --kind-112: #f48771;
+  --kind-trafik: #d7ba7d;
+  --kind-politi: #9cdcfe;
+
+  --box: 1px solid #3f3f46;
+  --window: 1px solid #3f3f46;
+  --title: #2d2d30;
+  --title-ink: #f1f1f1;
+  --title-lift: inset 0 -1px #3f3f46;
+
+  --nav: #2d2d30;
+  --nav-ink: #cfcfcf;
+  --nav-strong: #ffffff;
+  --nav-on: #007acc;
+  --nav-on-ink: #ffffff;
+
+  --button: #3f3f46;
+  --button-ink: #f1f1f1;
+  --button-rule: #55555c;
+  --hover: #505058;
+  --hover-rule: #007acc;
+  --press: #007acc;
+  --field: #333337;
+  --field-ink: #f1f1f1;
+  --field-rule: #55555c;
+
+  --night: #18181a;
+  --grid: #2b2b2e;
+  --grid-strong: #45454c;
+  --band-rule: #333337;
+  --allday: #3f3f46;
+  --block-ink: #1e1e1e;
+
+  --map-land: #2d2d30;
+  --map-water: #1a1a1c;
+  --map-green: #2f3531;
+  --map-town: #37373d;
+  --map-border: #77777f;
+  --map-motorway: #5f5f68;
+  --map-main: #505058;
+  --map-road: #434349;
+  --map-rail: #505058;
+  --map-casing: rgba(0, 0, 0, .35);
+  --map-label: #c8c8c8;
+  --map-halo: #1a1a1c;
+  --map-icons: invert(1) brightness(.85);
+  color-scheme: dark;
+}
+
+:root[data-theme='vs-light'] {
+  --ground: #eeeef2;
+  --page: #ffffff;
+  --panel: #f7f7f9;
+  --raised: #ececf0;
+  --screen: #ffffff;
+  --rule: #cccedb;
+  --paper: #1e1e1e;
+  --mute: #505050;
+  --faint: #868686;
+  --glass: rgba(247, 247, 249, .97);
+  --dialog: #f7f7f9;
+  --backdrop: rgba(30, 30, 40, .3);
+
+  --price: #008a70;
+  --temp: #9a6200;
+  --rain: #1570c4;
+  --f1: #c8291f;
+  --cal: #5c6275;
+  --good: #1e8449;
+  --slow: #9a6a00;
+  --bad: #c8291f;
+  --danger: #a31515;
+  --danger-rule: #a31515;
+  --problem: #a31515;
+  --kind-112: #a31515;
+  --kind-trafik: #795e26;
+  --kind-politi: #0451a5;
+
+  --box: 1px solid #cccedb;
+  --window: 1px solid #cccedb;
+  --title: #eeeef2;
+  --title-ink: #1e1e1e;
+  --title-lift: inset 0 -1px #cccedb;
+
+  --nav: #eeeef2;
+  --nav-ink: #1e1e1e;
+  --nav-strong: #000000;
+  --nav-on: #007acc;
+  --nav-on-ink: #ffffff;
+
+  --button: #ececf0;
+  --button-ink: #1e1e1e;
+  --button-rule: #cccedb;
+  --hover: #c9def5;
+  --hover-rule: #007acc;
+  --press: #007acc;
+  --field: #ffffff;
+  --field-ink: #1e1e1e;
+  --field-rule: #cccedb;
+
+  --night: #e9e9ee;
+  --grid: #eeeef2;
+  --grid-strong: #cccedb;
+  --band-rule: #dfe0e6;
+  --allday: #e4e4ea;
+  --block-ink: #ffffff;
+
+  --map-land: #f5f5f5;
+  --map-water: #cfe0ee;
+  --map-green: #e3ecdf;
+  --map-town: #ebebee;
+  --map-border: #8a8a95;
+  --map-motorway: #b9bcc6;
+  --map-main: #cdcfd8;
+  --map-road: #e0e1e7;
+  --map-rail: #b9bcc6;
+  --map-casing: #d4d5dd;
+  --map-label: #1e1e1e;
+  --map-halo: #ffffff;
+  --map-ink: #1e1e1e;
+  --map-icons: none;
+  color-scheme: light;
+}

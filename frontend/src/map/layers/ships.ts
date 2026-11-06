@@ -3,6 +3,7 @@ import { empty, Live, point, shapeIcon } from '../live'
 import { flag, kind, KIND_NAME, NAV_STATUS, typeName } from '../shipInfo'
 import { esc, link, rows, type Row } from '../text'
 import type { Ship } from '../types'
+import { labelPaint } from '../theme'
 
 const POLL_MS = 15_000
 const HULL = '#5fd3b0', RESCUE = '#ff8a5c', MARK = '#8fd3ff', DISTRESS = '#ff5c4d'
@@ -92,9 +93,7 @@ export function addShips(live: Live): void {
       'text-optional': true,
     },
     paint: {
-      'text-color': ['match', ['get', 'kind'], 'sar', RESCUE, 'aton', MARK, 'sart', DISTRESS, HULL],
-      'text-halo-color': '#0b1720',
-      'text-halo-width': 1.2,
+      ...labelPaint(['match', ['get', 'kind'], 'sar', RESCUE, 'aton', MARK, 'sart', DISTRESS, HULL], 1.2),
     },
   })
 

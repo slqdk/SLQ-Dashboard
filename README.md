@@ -22,7 +22,8 @@ sin egen LXC på Proxmox. Lavet til pc'en; på telefonen virker det bare.
 
 Øverst til højre står ping-indikatoren: **Her** er svartiden fra din browser til
 serveren, **Server** er svartiden fra serveren og ud. Klik for detaljer og
-belastning.
+belastning. Ved siden af vælger du tema: Mørk, Windows 7, Windows XP, Windows 2000 eller
+Visual Studio 2017 i blå, mørk og lys. Kortet følger med, og hver bruger har sit eget.
 
 - Installation på Proxmox: [docs/PROXMOX.md](docs/PROXMOX.md)
 - Beslutninger, status og næste skridt: [docs/PLAN.md](docs/PLAN.md)

@@ -2,6 +2,7 @@
 import { empty, Live, point, shapeIcon } from '../live'
 import { esc, rows } from '../text'
 import type { Train } from '../types'
+import { labelPaint } from '../theme'
 
 const POLL_MS = 60_000
 
@@ -33,7 +34,7 @@ export function addTrains(live: Live): void {
       'text-line-height': 1.15,
       'text-optional': true,
     },
-    paint: { 'text-color': '#a9c9ff', 'text-halo-color': '#0b1720', 'text-halo-width': 1.2 },
+    paint: { ...labelPaint('#a9c9ff', 1.2) },
   })
 
   live.onClick('trains-icon', (e) => {

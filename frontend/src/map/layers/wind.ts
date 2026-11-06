@@ -2,6 +2,7 @@
 import { empty, Live, point, sdfIcon } from '../live'
 import { compass, esc, hhmm, number, rows } from '../text'
 import type { WindStation } from '../types'
+import { labelPaint } from '../theme'
 
 const POLL_MS = 5 * 60_000
 const CLASSES: [number, string][] = [[5.5, 'let til jævn vind'], [10.8, 'frisk vind'], [13.9, 'hård vind'], [17.2, 'kuling'], [20.8, 'hård kuling'],
@@ -38,7 +39,7 @@ export function addWind(live: Live): void {
       'text-anchor': 'top',
       'text-optional': true,
     },
-    paint: { 'icon-color': COLOR, 'icon-halo-color': 'rgba(0,0,0,.6)', 'icon-halo-width': 1, 'text-color': COLOR, 'text-halo-color': '#0b1720', 'text-halo-width': 1.2 },
+    paint: { 'icon-color': COLOR, 'icon-halo-color': 'rgba(0,0,0,.6)', 'icon-halo-width': 1, ...labelPaint(COLOR, 1.2) },
   })
 
   live.onClick('wind-arrow', (e) => {

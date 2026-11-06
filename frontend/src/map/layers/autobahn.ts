@@ -2,6 +2,7 @@
 import { empty, Live, point } from '../live'
 import { cap, esc } from '../text'
 import type { AutobahnEvent } from '../types'
+import { labelPaint } from '../theme'
 
 const POLL_MS = 120_000
 const COLORS: Record<string, string> = { melding: '#ff7a45', spærring: '#ffb300', vejarbejde: '#9aa5b5' }
@@ -38,7 +39,7 @@ export function addAutobahn(live: Live): void {
       'text-optional': true,
       'symbol-sort-key': ['case', ['get', 'blocked'], 0, 1],
     },
-    paint: { 'text-color': ['get', 'color'], 'text-halo-color': '#0b1720', 'text-halo-width': 1.3 },
+    paint: { ...labelPaint(['get', 'color'], 1.3) },
   })
 
   live.onClick('autobahn-hit', (e) => {

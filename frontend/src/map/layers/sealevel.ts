@@ -2,6 +2,7 @@
 import { empty, Live, point } from '../live'
 import { esc, hhmm, link, rows, signed } from '../text'
 import type { Gauge } from '../types'
+import { labelPaint } from '../theme'
 
 const POLL_MS = 5 * 60_000
 const COLOR = ['step', ['get', 'level'], '#5aa9ff', -80, '#8b97a8', 100, '#ffd24a', 150, '#ff9f43', 200, '#ff5c4d']
@@ -29,7 +30,7 @@ export function addSeaLevel(live: Live): void {
       'text-anchor': 'left',
       'text-optional': true,
     },
-    paint: { 'text-color': COLOR, 'text-halo-color': '#0b1720', 'text-halo-width': 1.2 },
+    paint: { ...labelPaint(COLOR, 1.2) },
   })
 
   live.onClick('sealevel-dot', (e) => {

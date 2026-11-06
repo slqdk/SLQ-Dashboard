@@ -2,6 +2,7 @@
 import { empty, Live, point } from '../live'
 import { cap, esc, hhmm, rows, stamp } from '../text'
 import type { Alarm } from '../types'
+import { labelPaint } from '../theme'
 
 const POLL_MS = 60_000
 const FRESH_MINUTES = 20
@@ -46,7 +47,7 @@ export function addAlarms(live: Live): void {
       'text-optional': true,
       'symbol-sort-key': ['get', 'ageMin'],     // the newest wins when labels collide
     },
-    paint: { 'text-color': '#ff8a7e', 'text-halo-color': '#0b1720', 'text-halo-width': 1.3 },
+    paint: { ...labelPaint('#ff8a7e', 1.3) },
   })
 
   const draw = () => {

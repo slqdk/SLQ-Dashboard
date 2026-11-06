@@ -143,3 +143,27 @@ def test_only_files_at_the_top_of_the_build_are_served(tmp_path):
     assert root_file("..", tmp_path) is None
     assert root_file("", tmp_path) is None
     assert root_file("findes-ikke", tmp_path) is None
+
+
+# ---- themes ------------------------------------------------------------------------
+
+def test_a_theme_follows_the_person(client):
+    assert client.get("/api/auth/status").json()["user"]["theme"] == ""
+    assert client.patch("/api/me/theme", json={"theme": "win2k"}).status_code == 200
+    assert client.get("/api/auth/status").json()["user"]["theme"] == "win2k"
+
+
+def test_an_unknown_theme_is_refused(client):
+    assert client.patch("/api/me/theme", json={"theme": "javascript:"}).status_code == 400
+    assert client.get("/api/auth/status").json()["user"]["theme"] == ""
+
+
+def test_every_theme_in_the_stylesheet_is_known():
+    import re
+    from pathlib import Path
+    from app.core.auth import THEMES
+    root = Path(__file__).resolve().parents[2] / "frontend" / "src"
+    css = (root / "themes.css").read_text(encoding="utf-8")
+    picker = (root / "core" / "theme.ts").read_text(encoding="utf-8")
+    assert set(re.findall(r"\[data-theme='([\w-]+)'\] \{", css)) == set(THEMES) - {"dark"}
+    assert re.findall(r"^  \['([\w-]+)', '", picker, re.M) == list(THEMES)

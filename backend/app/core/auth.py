@@ -86,9 +86,12 @@ def password_problem(password: str) -> str | None:
 
 # ---- users ----------------------------------------------------------------
 
+THEMES = ("dark", "win7", "winxp", "win2k", "vs-blue", "vs-dark", "vs-light")
+
+
 def user_dto(r) -> dict:
     return {"id": r["id"], "username": r["username"], "role": r["role"],
-            "name": r["name"] or "", "createdAt": r["created_at"]}
+            "name": r["name"] or "", "theme": r["theme"], "createdAt": r["created_at"]}
 
 
 def user_count() -> int:
@@ -178,6 +181,13 @@ def set_name(uid: int, name: str) -> dict:
     if r is None:
         raise LookupError("No such account.")
     return user_dto(r)
+
+
+def set_theme(uid: int, theme: str) -> None:
+    if theme not in THEMES:
+        raise ValueError("Det tema findes ikke.")
+    with db.connect() as con:
+        con.execute("UPDATE users SET theme=? WHERE id=?", (theme, uid))
 
 
 def set_role(uid: int, role: str) -> None:

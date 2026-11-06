@@ -4,6 +4,7 @@ import { api } from './core/api'
 import { clock, longDate } from './core/format'
 import { Ping } from './core/Ping'
 import { readRoute, SECTIONS } from './core/routes'
+import { savedTheme, showTheme, THEMES, type Theme } from './core/theme'
 import type { User } from './core/types'
 import { useNow } from './core/usePoll'
 import { Overview } from './overview/Overview'
@@ -60,7 +61,13 @@ function Login({ needsSetup, onDone }: { needsSetup: boolean; onDone: (u: User) 
 
 function SmallClock() {
   const now = useNow(1000)
-  return <p className="nav-clock"><span>{longDate(now)}</span> <time>{clock(now)}</time></p>
+  return (
+    <p className="nav-clock">
+      <span className="wide">{longDate(now)}</span>
+      <span className="short">{now.getDate()}/{now.getMonth() + 1}</span>
+      {' '}<time>{clock(now)}</time>
+    </p>
+  )
 }
 
 export function App() {
@@ -68,8 +75,22 @@ export function App() {
   const [needsSetup, setNeedsSetup] = useState(false)
   const [ready, setReady] = useState(false)
   const path = useRoute()
+  const [theme, setTheme] = useState<Theme>(savedTheme)
 
   const lost = useCallback(() => setUser(null), [])
+  const signedIn = user?.id
+  const theirs = user?.theme
+
+  // A person's own choice follows them, whatever this browser showed last.
+  useEffect(() => {
+    if (signedIn && theirs) setTheme(showTheme(theirs))
+  }, [signedIn, theirs])
+
+  const chooseTheme = (id: string) => {
+    setTheme(showTheme(id))
+    if (user) setUser({ ...user, theme: id })
+    void api('/api/me/theme', { method: 'PATCH', body: { theme: id } }).catch(() => undefined)      // this browser has it anyway
+  }
 
   useEffect(() => {
     api<{ needsSetup: boolean; user: User | null }>('/api/auth/status').then((s) => {
@@ -104,12 +125,15 @@ export function App() {
         <div className="nav-right">
           {path !== '' && <SmallClock />}
           <Ping />
-          <button className="nav-user" onClick={() => void logout()} title="Log ud">Log ud {user.name || user.username}</button>
+          <select className="nav-theme" aria-label="Tema" value={theme} onChange={(e) => chooseTheme(e.target.value)}>
+            {THEMES.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+          </select>
+          <button className="nav-user" onClick={() => void logout()} title="Log ud">Log ud <span className="wide">{user.name || user.username}</span></button>
         </div>
       </header>
 
       {!allowed && <NoAccess />}
-      {path === '' && <Overview user={user} onAuthLost={lost} />}
+      {path === '' && <Overview user={user} theme={theme} onAuthLost={lost} />}
       {allowed && section?.id === 'calendar' && <Calendar onAuthLost={lost} />}
       {allowed && section?.id === 'dklive' && <DkLive onAuthLost={lost} />}
       {allowed && section?.id === 'news' && <News onAuthLost={lost} />}

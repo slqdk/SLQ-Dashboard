@@ -3,11 +3,18 @@ import { metres, model, secondLabel } from './aircraft'
 import { limitCenter } from './limit'
 import { flag, kind, typeName } from './shipInfo'
 import { cap, compass, esc, link, rows, signed, webAddress } from './text'
+import { labelPaint } from './theme'
 import type { Aircraft } from './types'
 
 const plane = (fields: Partial<Aircraft>): Aircraft => ({
   id: 'a1', callsign: null, reg: null, type: null, desc: null, operator: null, category: null, lat: 55, lon: 10, alt: null, onGround: false,
   gs: null, track: null, vr: null, squawk: null, emergency: null, military: false, seen: 0, route: null, ...fields,
+})
+
+describe('labels of the live layers', () => {
+  it('keep their own colour on the dark map', () => {
+    expect(labelPaint('#ffd24a', 1.3)).toEqual({ 'text-color': '#ffd24a', 'text-halo-color': '#0b1720', 'text-halo-width': 1.3 })
+  })
 })
 
 describe('text for popups', () => {

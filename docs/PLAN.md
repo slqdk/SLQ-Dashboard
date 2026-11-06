@@ -90,6 +90,23 @@ export turned out to be Danish, which the first version refused; English and Dan
 now. Dates are UTC: a real export's tracks start on the second their rows say. The second
 Distance column is the one to read, always metres. Every filled column stays in `raw`.
 
+## Themes (0.8.0)
+Søren is not fond of the dark look and named what he likes: Windows 7, XP and 2000, dark mode
+and Visual Studio 2017. So there are seven themes, chosen in the top bar: Mørk, the three
+Windows looks and VS 2017's Blue, Dark and Light. A person's choice is stored on the account
+(`users.theme`, migration 2), and the browser remembers it for the login page.
+
+A theme is a set of tokens on `:root[data-theme]`, with a few rules for what makes it look
+like itself: title bars on panels, bevels, the menu bar, Windows 2000's desktop blue as the
+sea. Only colours, gradients and system fonts, so Segoe UI and Tahoma come from his own
+Windows, and here they fell back to another face: sizes and the top bar's width were
+checked with that one. `--fit` scales what was set in the narrow Sofia face.
+
+The map has all its colours from tokens, so it is light in the light themes. `map/theme.ts`
+sets every layer of the style, since a light map shows any dark one left over, and a live
+layer's label turns to plain ink there. Choosing a theme builds the map anew. Markers keep
+their colours and their dark outline, which reads on both.
+
 ## Not verified
 
 - The Docker image, `proxmox/create-lxc.sh` and the go2rtc image have never run: no

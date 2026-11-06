@@ -48,8 +48,13 @@ def _c001_auth(con: sqlite3.Connection) -> None:
     con.executescript(auth.AUTH_SCHEMA)
 
 
+def _c002_theme(con: sqlite3.Connection) -> None:
+    add_column(con, "users", "theme", "TEXT NOT NULL DEFAULT ''")
+
+
 CORE: list[tuple[int, str, callable]] = [
     (1, "users, sessions, section access", _c001_auth),
+    (2, "a theme per person", _c002_theme),
 ]
 
 

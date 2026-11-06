@@ -58,7 +58,15 @@ Proxmox LXC. **Read `docs/PLAN.md` first: decisions, what is built, what is open
 
 ## Conventions
 UI text is Danish; identifiers, comments and these docs English. Colour carries
-meaning only. Chart colours are checked with the dataviz palette validator.
+meaning only. Chart colours are checked with the dataviz palette validator, per theme, on
+the theme's own surface.
+
+A theme is tokens: `styles.css` has them with the dark theme's values, `themes.css` the
+others, and `core/theme.ts` and `THEMES` in `core/auth.py` the list, which a test holds
+together. Write a new colour, corner or size as a token, not a value. The map takes its
+colours from the `--map-` tokens in `map/theme.ts`, and a live layer's label goes through
+`labelPaint`, since its light colour does not read on a light map. Only colours, gradients
+and system fonts make a theme: no pictures and no logos.
 
 ## Verify a change
 ```

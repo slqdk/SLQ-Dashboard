@@ -50,7 +50,7 @@ const LiveMap = lazy(() => import('../map/LiveMap').catch(() => ({ default: () =
 
 const megawatt = (value: number | null | undefined) => (value != null ? `${whole(value)} MW` : '–')
 
-export function Overview({ user, onAuthLost }: { user: User; onAuthLost: () => void }) {
+export function Overview({ user, theme, onAuthLost }: { user: User; theme: string; onAuthLost: () => void }) {
   const now = useNow(1000)
   const free = useRef<HTMLDivElement>(null)
   const { data, error } = usePoll<Data>('/api/overview', LIVE_SECONDS, onAuthLost)
@@ -60,7 +60,7 @@ export function Overview({ user, onAuthLost }: { user: User; onAuthLost: () => v
 
   return (
     <main className="overview">
-      {b.dklive && <Suspense fallback={null}><LiveMap layers={b.dklive.layers} free={free} /></Suspense>}
+      {b.dklive && <Suspense fallback={null}><LiveMap key={theme} layers={b.dklive.layers} free={free} /></Suspense>}
       <div className="overlay">
         <header className="hero">
           <div className="hero-date">

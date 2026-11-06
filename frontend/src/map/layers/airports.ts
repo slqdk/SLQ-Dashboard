@@ -2,6 +2,7 @@
 import { empty, Live, plane, point, shapeIcon } from '../live'
 import { esc, link, rows, type Row } from '../text'
 import type { Aircraft, Airport } from '../types'
+import { labelPaint } from '../theme'
 
 const POLL_MS = 10 * 60_000
 const NEAR_KM = 15          // aircraft this close are "near"
@@ -106,7 +107,7 @@ export function addAirports(live: Live): void {
       'text-optional': true,
       'symbol-sort-key': ['match', ['get', 'type'], 'large', 0, 'medium', 1, 2],
     },
-    paint: { 'text-color': '#c6d3da', 'text-halo-color': '#0b1720', 'text-halo-width': 1.2 },
+    paint: { ...labelPaint('#c6d3da', 1.2) },
   })
   live.add({ id: 'airports-hit', type: 'circle', source: 'airports', filter: ['any', ['!=', ['get', 'type'], 'small'], ['>=', ['zoom'], 8]], paint: { 'circle-radius': 14, 'circle-opacity': 0, 'circle-stroke-opacity': 0 } })
 
