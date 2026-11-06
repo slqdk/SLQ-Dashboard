@@ -1151,6 +1151,11 @@ def test_dividends_after_tax_and_results_per_year(client):
         {"year": "2023", "currency": "DKK", "dividends": 0.0, "result": 1000.0}]
 
 
+def test_a_year_of_only_purchases_shows_no_line(client):
+    _import(client, _nordnet(("1", "2023-01-10", "KØBT", "Novo Nordisk B", _NOVO, "20", "-6000", "6000", "0", "20")))
+    assert client.get("/api/s/aktier/state").json()["years"] == []
+
+
 def test_importing_again_adds_nothing(client):
     _import(client)
     assert _import(client).json() == {"added": 0, "updated": 0, "same": 7, "skipped": 0}

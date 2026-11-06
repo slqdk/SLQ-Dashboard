@@ -132,7 +132,7 @@ def years(user_id: int) -> list[dict]:
         if row["result"] is not None:
             line(year, row["result_currency"])["result"] += row["result"]
     return [{**v, "dividends": round(v["dividends"], 2), "result": round(v["result"], 2)}
-            for _key, v in sorted(found.items(), reverse=True)]
+            for _key, v in sorted(found.items(), reverse=True) if v["dividends"] or v["result"]]
 
 
 def _mode() -> str:
