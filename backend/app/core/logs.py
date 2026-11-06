@@ -108,6 +108,9 @@ def setup() -> None:
     root.setLevel(logging.INFO)
     root.addHandler(file_handler)
     root.addHandler(_RingHandler())
+    # httpx logs each request's full address at INFO, and an address can hold a
+    # YouTube key or a camera's login.
+    logging.getLogger("httpx").setLevel(logging.WARNING)
     _configured = True
 
 

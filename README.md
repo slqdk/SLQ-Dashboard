@@ -15,6 +15,8 @@ sin egen LXC på Proxmox. Lavet til pc'en; på telefonen virker det bare.
 | **FamilyLog** | Månedens forbrug og søgning, kun læsning | FamilyLog 0.5.0 med læsenøgle pr. person |
 | **Formel 1** | Sæsonens sessioner, ikke noget live | Jolpica |
 | **SLQ DL** | Late night-historie, dato for dato, og de nyeste monologer | Egen database med kilder, YouTube |
+| **Printere** | Status på printerne: fremskridt, tid tilbage, temperaturer. Kun læsning | Bambu Lab-printere direkte på netværket |
+| **Kameraer** | Billeder og live-video bag login. Familien får det kun, hvis du vælger det | Tapo C200 gennem go2rtc |
 | **Links** | Dine links i mapper | Egen database |
 | **Admin** | Familiens brugere og al opsætning | |
 
@@ -31,6 +33,7 @@ belastning.
 cd backend && pip install -r requirements-dev.txt && python -m pytest -q
 cd frontend && npm ci && npm test && npm run build
 python3 tools/mock_upstreams.py 9100 &                 # falske data
+python3 tools/mock_printer.py 9101 &                   # en falsk printer, kræver cryptography
 cd backend && APP_DATA_DIR=./data APP_DKLIVE_URL=http://127.0.0.1:9100 \
   APP_JOLPICA_URL=http://127.0.0.1:9100/jolpica python -m uvicorn app.main:app --port 8080
 cd frontend && npm run dev                             # proxier /api til :8080

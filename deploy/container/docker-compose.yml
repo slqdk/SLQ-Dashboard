@@ -19,6 +19,19 @@ services:
     environment:
       TZ: Europe/Copenhagen
       APP_DATA_DIR: /data
+      APP_GO2RTC_URL: http://go2rtc:1984
+    depends_on:
+      - go2rtc
+
+  # Turns the cameras' RTSP into pictures and video a browser can show. No ports:
+  # only the app reaches it, so every picture passes the dashboard's login, and
+  # what it knows about the cameras stays in its memory. RTSP and WebRTC are off,
+  # nothing here needs them.
+  go2rtc:
+    image: alexxit/go2rtc:1.9.15
+    container_name: slq-dashboard-go2rtc
+    restart: unless-stopped
+    command: ["go2rtc", "-config", "{rtsp: {listen: ''}, webrtc: {listen: ''}, srtp: {listen: ''}}"]
 
 volumes:
   slq-dashboard-data:

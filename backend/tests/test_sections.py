@@ -7,6 +7,7 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+import httpx
 import pytest
 
 CPH = ZoneInfo("Europe/Copenhagen")
@@ -690,3 +691,343 @@ def test_another_language_gets_a_clear_message(client):
 def test_a_zip_gets_a_clear_message(client):
     r = client.post("/api/s/logmylife/import/strava", content=b"PK\x03\x04\xff\xfe\x00")
     assert r.status_code == 400 and "zip" in r.json()["detail"]
+
+
+# ---- Printere ----------------------------------------------------------------------
+
+def _mock_printer():
+    import importlib.util
+    path = Path(__file__).resolve().parents[2] / "tools" / "mock_printer.py"
+    spec = importlib.util.spec_from_file_location("mock_printer", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _wait(check, seconds=6.0):
+    import time
+    ends = time.monotonic() + seconds
+    while time.monotonic() < ends:
+        if value := check():
+            return value
+        time.sleep(.02)
+    raise AssertionError("waited in vain")
+
+
+def test_a_report_of_a_field_or_two_keeps_the_rest():
+    from app.sections.printers import watcher
+    state = {}
+    watcher.merge(state, {"print": {"gcode_state": "RUNNING", "mc_percent": 10, "nozzle_temper": 220.1}})
+    watcher.merge(state, {"print": {"mc_percent": 11}})
+    watcher.merge(state, {"info": {"command": "get_version"}})
+    assert state == {"gcode_state": "RUNNING", "mc_percent": 11, "nozzle_temper": 220.1}
+
+
+def test_printer_state_in_words():
+    from app.sections.printers import watcher
+    printer = {"id": 1, "name": "A1"}
+    running = {"gcode_state": "RUNNING", "subtask_name": "beslag.3mf", "gcode_file": "/x/plate_1.gcode", "print_error": 0}
+    shown = watcher.dto(printer, running, True, "")
+    assert (shown["stateText"], shown["active"], shown["file"], shown["error"]) == ("Printer", True, "beslag.3mf", "")
+    assert watcher.dto(printer, {"gcode_state": "FINISH"}, True, "")["active"] is False
+    assert watcher.dto(printer, running, False, "")["stateText"] == "Offline"
+    assert watcher.dto(printer, {**running, "print_error": 0x0300400C}, True, "")["error"] == "0300-400C"
+
+
+def test_the_printer_section_can_only_ask_for_a_report():
+    from app.sections.printers import watcher
+    tree = ast.parse(Path(watcher.__file__).read_text(encoding="utf-8"))
+    publishes = [n for n in ast.walk(tree) if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
+                 and n.func.attr == "publish"]
+    assert len(publishes) == 1
+    assert publishes[0].args[1].id == "PUSHALL"
+    assert json.loads(watcher.PUSHALL)["pushing"]["command"] == "pushall"
+
+
+def test_printer_reports_reach_the_page(client):
+    from app.sections.printers import watcher
+    mock = _mock_printer()
+    printer = mock.Printer()
+    port = printer.start()
+    try:
+        client.post("/api/s/printers/config", json={"name": "P1S", "host": f"127.0.0.1:{port}",
+                                                    "serial": mock.SERIAL, "code": mock.CODE})
+        watcher.job()
+        read = lambda: client.get("/api/s/printers/state").json()["printers"][0]
+        shown = _wait(lambda: (p := read())["online"] and p)
+        assert (shown["stateText"], shown["percent"], shown["nozzle"], shown["file"]) == ("Printer", 62, 219.8, "beslag-v3.3mf")
+        printer.send({"print": {"mc_percent": 63}})
+        shown = _wait(lambda: (p := read())["percent"] == 63 and p)
+        assert shown["nozzle"] == 219.8 and shown["layer"] == 118
+        assert [r["pushing"]["command"] for r in printer.requests] == ["pushall"]
+        assert client.get("/api/overview").json()["blocks"]["printers"]["printers"][0]["percent"] == 63
+    finally:
+        watcher.reset()
+        printer.stop()
+
+
+def test_reconnecting_does_not_ask_for_everything_again():
+    from app.sections.printers import watcher
+    mock = _mock_printer()
+    printer = mock.Printer()
+    port = printer.start()
+    watch = watcher._Watch({"id": 1, "name": "A1", "host": f"127.0.0.1:{port}", "serial": mock.SERIAL}, mock.CODE)
+    watch.client.reconnect_delay_set(1, 1)
+    watch.start()
+    try:
+        _wait(lambda: watch.state)
+        printer.clients[0].shutdown(2)
+        _wait(lambda: not watch.connected)
+        _wait(lambda: watch.connected)
+        assert len(printer.requests) == 1
+    finally:
+        watch.stop()
+        printer.stop()
+
+
+def test_a_wrong_access_code_is_said_in_words(client):
+    from app.sections.printers import watcher
+    mock = _mock_printer()
+    printer = mock.Printer()
+    port = printer.start()
+    try:
+        client.post("/api/s/printers/config", json={"name": "P1S", "host": f"127.0.0.1:{port}",
+                                                    "serial": mock.SERIAL, "code": "forkert"})
+        watcher.job()
+        status = _wait(lambda: "afviste" in (s := client.get("/api/s/printers/config").json()["status"])["text"] and s)
+        assert status == {"ok": False, "text": "Printeren afviste adgangskoden."}
+    finally:
+        watcher.reset()
+        printer.stop()
+
+
+def test_a_new_access_code_opens_a_new_connection(client):
+    from app.sections.printers import watcher
+    mock = _mock_printer()
+    printer = mock.Printer()
+    port = printer.start()
+    try:
+        made = client.post("/api/s/printers/config", json={"name": "P1S", "host": f"127.0.0.1:{port}",
+                                                           "serial": mock.SERIAL, "code": "forkert"}).json()
+        watcher.job()
+        _wait(lambda: watcher._watches[made["id"]].problem)
+        client.put(f"/api/s/printers/config/{made['id']}", json={**made, "code": mock.CODE})
+        watcher.job()
+        assert _wait(lambda: client.get("/api/s/printers/state").json()["printers"][0]["online"])
+    finally:
+        watcher.reset()
+        printer.stop()
+
+
+def test_an_access_code_stays_on_the_server(client, family):
+    from app.core import db
+    made = client.post("/api/s/printers/config", json={"name": "A1", "host": "192.0.2.8", "serial": "03919A000000001",
+                                                       "code": "hemmelig"})
+    assert made.status_code == 200 and "hemmelig" not in made.text
+    assert "hemmelig" not in client.get("/api/s/printers/config").text
+    assert "hemmelig" not in client.get("/api/s/printers/state").text
+    with db.connect() as con:
+        assert "hemmelig" not in con.execute("SELECT code FROM printers").fetchone()["code"]
+    assert client.put(f"/api/s/printers/config/{made.json()['id']}",
+                      json={"name": "A1 mini", "host": "192.0.2.8", "serial": "03919A000000001"}).status_code == 200
+    from app.sections.printers import store
+    assert store.code_of(made.json()["id"]) == "hemmelig"
+
+
+def test_only_admin_sets_up_printers(client, family):
+    assert family.get("/api/s/printers/state").status_code == 200
+    assert family.get("/api/s/printers/config").status_code == 403
+    assert family.post("/api/s/printers/config", json={"name": "x", "host": "h", "serial": "s", "code": "c"}).status_code == 403
+
+
+@pytest.mark.parametrize("body", [
+    {"name": "", "host": "192.0.2.8", "serial": "S1", "code": "c"},
+    {"name": "A1", "host": "192.0.2.8", "serial": "S1", "code": ""},
+    {"name": "A1", "host": "192.0.2.8/x", "serial": "S1", "code": "c"},
+    {"name": "A1", "host": "192.0.2.8", "serial": "S1/#", "code": "c"},
+])
+def test_a_printer_needs_clean_details(client, body):
+    assert client.post("/api/s/printers/config", json=body).status_code == 400
+
+
+# ---- Kameraer ----------------------------------------------------------------------
+
+class _FakeGo2rtc:
+    """Stands in for httpx in the camera client."""
+    HTTPError = httpx.HTTPError
+
+    def __init__(self, picture=b"jpeg", status=200):
+        self.picture, self.status, self.streams, self.calls = picture, status, {}, []
+
+    def patch(self, _url, params, timeout):
+        self.streams[params["name"]] = params["src"]
+        return httpx.Response(200, request=httpx.Request("PATCH", _url))
+
+    def delete(self, _url, params, timeout):
+        self.streams.pop(params["src"])
+        return httpx.Response(400)      # go2rtc without a config file; it is gone all the same
+
+    def get(self, url, params=None, timeout=None):
+        self.calls.append((url, params))
+        if url.endswith("/api/streams"):
+            return httpx.Response(200, json={k: {} for k in self.streams})
+        return httpx.Response(self.status, content=self.picture)
+
+
+def _camera(client, **extra):
+    body = {"name": "Indkørsel", "host": "192.0.2.20", "username": "tapo", "password": "p@ss/w:rd", **extra}
+    return client.post("/api/s/cameras/config", json=body)
+
+
+def _go2rtc(monkeypatch, client, **kwargs):
+    from app.sections.cameras import client as cam
+    fake = _FakeGo2rtc(**kwargs)
+    monkeypatch.setattr(cam, "httpx", fake)
+    assert client.put("/api/admin/setup", json={"go2rtcUrl": "http://go2rtc:1984"}).status_code == 200
+    return fake, cam
+
+
+def test_a_camera_is_two_streams_with_the_login_quoted(client, monkeypatch):
+    fake, cam = _go2rtc(monkeypatch, client)
+    made = _camera(client).json()
+    cam.job()
+    assert fake.streams == {
+        f"cam{made['id']}": "rtsp://tapo:p%40ss%2Fw%3Ard@192.0.2.20:554/stream1",
+        f"cam{made['id']}_lo": "rtsp://tapo:p%40ss%2Fw%3Ard@192.0.2.20:554/stream2"}
+    assert client.get("/api/s/cameras/config").json()["status"]["ok"] is True
+
+
+def test_a_removed_camera_leaves_go2rtc_and_other_streams_stay(client, monkeypatch):
+    fake, cam = _go2rtc(monkeypatch, client)
+    made = _camera(client).json()
+    cam.job()
+    fake.streams["noget-andet"] = "rtsp://x"
+    client.delete(f"/api/s/cameras/config/{made['id']}")
+    cam.job()
+    assert list(fake.streams) == ["noget-andet"]
+
+
+def test_the_picture_passes_through_the_dashboard(client, monkeypatch):
+    fake, cam = _go2rtc(monkeypatch, client, picture=b"\xff\xd8billede")
+    made = _camera(client).json()
+    r = client.get(f"/api/s/cameras/{made['id']}/frame.jpg")
+    assert (r.status_code, r.content, r.headers["content-type"]) == (200, b"\xff\xd8billede", "image/jpeg")
+    assert fake.calls[-1][1]["src"] == f"cam{made['id']}_lo"
+    client.get(f"/api/s/cameras/{made['id']}/frame.jpg?size=hi")
+    assert fake.calls[-1][1]["src"] == f"cam{made['id']}"
+
+
+@pytest.mark.parametrize("kwargs", [{"status": 404}, {"status": 200, "picture": b""}])
+def test_no_picture_is_said_plainly(client, monkeypatch, kwargs):
+    _go2rtc(monkeypatch, client, **kwargs)
+    made = _camera(client).json()
+    r = client.get(f"/api/s/cameras/{made['id']}/frame.jpg")
+    assert r.status_code == 503 and r.json()["detail"] == "Kameraet svarer ikke."
+
+
+def _live_upstream(monkeypatch, handler):
+    from app.sections.cameras import client as cam
+    real = httpx.AsyncClient
+    monkeypatch.setattr(httpx, "AsyncClient",
+                        lambda timeout: real(transport=httpx.MockTransport(handler), timeout=timeout))
+    return cam
+
+
+def test_live_video_passes_through_and_has_an_end(client, monkeypatch):
+    client.put("/api/admin/setup", json={"go2rtcUrl": "http://go2rtc:1984"})
+    made = _camera(client).json()
+    asked = {}
+
+    async def endless():
+        while True:
+            yield b"moof"
+
+    def handler(request):
+        asked.update(request.url.params)
+        return httpx.Response(200, headers={"content-type": 'video/mp4; codecs="avc1.42001F"'}, content=endless())
+
+    cam = _live_upstream(monkeypatch, handler)
+    monkeypatch.setattr(cam, "LIVE_SECONDS", 0)
+    r = client.get(f"/api/s/cameras/{made['id']}/live.mp4")
+    assert (r.status_code, r.content) == (200, b"moof")
+    assert r.headers["content-type"].startswith("video/mp4")
+    assert asked == {"src": f"cam{made['id']}", "video": "h264"}
+
+
+def test_live_video_that_cannot_start_is_said_plainly(client, monkeypatch):
+    client.put("/api/admin/setup", json={"go2rtcUrl": "http://go2rtc:1984"})
+    made = _camera(client).json()
+    _live_upstream(monkeypatch, lambda _request: httpx.Response(500, content=b"streams: dial tcp"))
+    r = client.get(f"/api/s/cameras/{made['id']}/live.mp4")
+    assert r.status_code == 503 and r.json()["detail"] == "Kameraet svarer ikke."
+
+
+def test_a_camera_that_does_not_exist_has_no_picture(client, monkeypatch):
+    fake, _cam = _go2rtc(monkeypatch, client)
+    assert client.get("/api/s/cameras/99/frame.jpg").status_code == 503
+    assert client.get("/api/s/cameras/99/live.mp4").status_code == 503
+    assert not fake.calls
+
+
+def test_a_camera_login_stays_on_the_server(client):
+    from app.core import db
+    from app.sections.cameras import store
+    made = _camera(client)
+    assert "p@ss" not in made.text and "p@ss" not in client.get("/api/s/cameras/config").text
+    assert "p@ss" not in client.get("/api/overview").text
+    with db.connect() as con:
+        assert "p@ss" not in con.execute("SELECT password FROM cameras").fetchone()["password"]
+    client.put(f"/api/s/cameras/config/{made.json()['id']}",
+               json={"name": "Have", "host": "192.0.2.20", "username": "tapo"})
+    assert "p%40ss" in store.source(made.json()["id"], "stream1")
+
+
+def test_request_addresses_stay_out_of_the_log(client):
+    """httpx logs whole addresses at INFO, with any key or login in them."""
+    import logging
+
+    from app.core import logs
+    logs.setup()
+    assert logging.getLogger("httpx").getEffectiveLevel() >= logging.WARNING
+
+
+def test_a_failed_request_does_not_tell_the_login(client, monkeypatch):
+    fake, cam = _go2rtc(monkeypatch, client)
+    _camera(client)
+
+    def fails(url, params, timeout):
+        request = httpx.Request("PATCH", url, params=params)
+        raise httpx.HTTPStatusError(f"bad {request.url}", request=request, response=httpx.Response(400))
+    monkeypatch.setattr(fake, "patch", fails)
+    cam.job()
+    assert client.get("/api/s/cameras/config").json()["status"] == {"ok": False, "text": "go2rtc svarer ikke (HTTPStatusError)."}
+
+
+def test_family_gets_cameras_only_when_given_them(client, family):
+    me = family.get("/api/auth/status").json()["user"]
+    assert "cameras" not in me["sections"] and "printers" in me["sections"]
+    assert family.get("/api/s/cameras/list").status_code == 403
+    _camera(client)
+    assert family.get("/api/s/cameras/1/frame.jpg").status_code == 403
+    assert "cameras" not in family.get("/api/overview").json()["blocks"]
+    client.patch(f"/api/admin/users/{me['id']}", json={"sections": me["sections"] + ["cameras"]})
+    assert len(family.get("/api/s/cameras/list").json()["cameras"]) == 1
+    assert family.get("/api/s/cameras/config").status_code == 403
+    assert family.post("/api/s/cameras/config", json={}).status_code == 403
+
+
+@pytest.mark.parametrize("body", [
+    {"name": "", "host": "192.0.2.20", "username": "tapo", "password": "x"},
+    {"name": "Have", "host": "192.0.2.20", "username": "tapo", "password": ""},
+    {"name": "Have", "host": "192.0.2.20/stream1#x", "username": "tapo", "password": "x"},
+])
+def test_a_camera_needs_clean_details(client, body):
+    assert client.post("/api/s/cameras/config", json=body).status_code == 400
+
+
+def test_the_overview_never_asks_a_camera(client, monkeypatch):
+    fake, _cam = _go2rtc(monkeypatch, client)
+    made = _camera(client).json()
+    fake.calls.clear()
+    assert client.get("/api/overview").json()["blocks"]["cameras"]["cameras"] == [{"id": made["id"], "name": "Indkørsel"}]
+    assert not fake.calls

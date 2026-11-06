@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Stand-ins for everything the dashboard reads, for development and the
-browser check: dk-live, Jolpica, RSS and Google. Everything it serves is made
-up. Standard library only.
+browser check: dk-live, Jolpica, RSS, Google and go2rtc. Everything it serves is
+made up. Standard library only. The printers have their own stand-in,
+tools/mock_printer.py.
 
     python3 tools/mock_upstreams.py 9100
 
@@ -13,9 +14,11 @@ Then start the backend with (see tools/dev.sh):
     APP_GOOGLE_TOKEN_URL=http://127.0.0.1:9100/google/token
     APP_GOOGLE_API_BASE=http://127.0.0.1:9100/google/api
     APP_YOUTUBE_FEED_URL=http://127.0.0.1:9100/youtube
+    APP_GO2RTC_URL=http://127.0.0.1:9100/go2rtc
 """
 from __future__ import annotations
 
+import base64
 import json
 import math
 import sys
@@ -33,6 +36,19 @@ def now() -> datetime:
 
 def ms(dt: datetime) -> int:
     return int(dt.timestamp() * 1000)
+
+
+# ---- go2rtc ----------------------------------------------------------------------
+
+CAMERA_PICTURE = base64.b64decode(
+    "/9j/4AAQSkZJRgABAgAAAQABAAD//gAQTGF2YzYwLjMxLjEwMgD/2wBDAAgYGBwYHCEhISEhISckJygoKCcnJyco"
+    "KCgrKyszMzMrKysoKCsrMDAzMzc5NzQ0MzQ5OTw8PEhIRUVUVFdnZ3z/xABWAAEBAQEBAQAAAAAAAAAAAAADAAEE"
+    "AgcBAQEBAQEBAQAAAAAAAAAAAAIAAQMFBgQQAQEAAAAAAAAAAAAAAAAAAAABEQEAAAAAAAAAAAAAAAAAAAAA/8AA"
+    "EQgANgBgAwESAAISAAMSAP/aAAwDAQACEQMRAD8A+TwkfrJ+QTwsNoiaFhkLDQsMgYaFhkImhYZCJ4SGQieEhtET"
+    "R6Nosakkkkkkkkny2Ej5snuieEhkInhIZCw8JDIGHhYZCJoWGQiaFhEImj2ZCx6STEkkkkkkkkk+awsfPk9oTwkM"
+    "hE8JDIWHhIZAw8JDaDDwkMhE8JDIRe01MSSSSSSSSSSSST59Gx4aeunVGx1TmnVGx1TmnVGx1TmnVGx0a5p1RsdG"
+    "gx0NNAkkkkkkkkkkkkkkkn//2Q==")
+STREAMS: dict[str, str] = {}
 
 
 # ---- dk-live ---------------------------------------------------------------------
@@ -230,6 +246,16 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
             return None
+        if path == "/go2rtc/api/streams":
+            return self._json({name: {"producers": [{"url": "rtsp://***@"}]} for name in STREAMS})
+        if path == "/go2rtc/api/frame.jpeg":
+            if query["src"][0] not in STREAMS:
+                return self._json({"error": "stream not found"}, 404)
+            self.send_response(200)
+            self.send_header("Content-Type", "image/jpeg")
+            self.end_headers()
+            self.wfile.write(CAMERA_PICTURE)
+            return None
         if path == "/google/auth":
             target = query["redirect_uri"][0] + "?" + urlencode({"code": "mock-code", "state": query["state"][0]})
             self.send_response(302)
@@ -245,6 +271,15 @@ class Handler(BaseHTTPRequestHandler):
             status = data.pop("__status", 200)
             return self._json(data, status)
         return self._json({"error": "not found"}, 404)
+
+    def do_PATCH(self):  # noqa: N802
+        query = parse_qs(urlparse(self.path).query)
+        STREAMS[query["name"][0]] = query["src"][0]
+        return self._json({})
+
+    def do_DELETE(self):  # noqa: N802
+        STREAMS.pop(parse_qs(urlparse(self.path).query)["src"][0], None)
+        return self._json({"error": "config file disabled"}, 400)
 
     def do_POST(self):  # noqa: N802
         if urlparse(self.path).path == "/google/token":

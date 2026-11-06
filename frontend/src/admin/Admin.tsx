@@ -227,12 +227,124 @@ function Secret({ label, name, setup, value, onChange }: {
   )
 }
 
+interface Device {
+  id?: number
+  [key: string]: unknown
+}
+
+interface DeviceSpec {
+  section: string
+  title: string
+  noun: string
+  fields: { key: string; label: string; hint?: string; secret?: boolean }[]
+}
+
+const PRINTERS: DeviceSpec = {
+  section: 'printers',
+  title: 'Printere',
+  noun: 'printer',
+  fields: [
+    { key: 'name', label: 'Navn' },
+    { key: 'host', label: 'IP-adresse' },
+    { key: 'serial', label: 'Serienummer' },
+    { key: 'code', label: 'LAN Access Code', secret: true },
+  ],
+}
+
+const CAMERAS: DeviceSpec = {
+  section: 'cameras',
+  title: 'Kameraer',
+  noun: 'kamera',
+  fields: [
+    { key: 'name', label: 'Navn' },
+    { key: 'host', label: 'IP-adresse' },
+    { key: 'username', label: 'Brugernavn fra Camera Account' },
+    { key: 'password', label: 'Adgangskode fra Camera Account', secret: true },
+  ],
+}
+
+/** The list saves by itself and asks every few seconds, so it can tell whether a
+ *  new device answers without touching the rest of the setup form. */
+function Devices({ spec, changed, onEdit, onAuthLost, children }: {
+  spec: DeviceSpec; changed: number; onEdit: (device: Device) => void; onAuthLost: () => void; children: React.ReactNode
+}) {
+  const { data, reload } = usePoll<{ items: Device[]; status: { ok: boolean; text: string } }>(
+    `/api/s/${spec.section}/config`, 5, onAuthLost)
+  useEffect(() => {
+    if (changed) void reload()
+  }, [changed, reload])
+  const s = data?.status
+  return (
+    <fieldset>
+      <legend>{spec.title}</legend>
+      {s && <p className={s.ok ? 'status ok' : 'status'}><span className={`dot dot-${s.ok ? 'good' : 'slow'}`} aria-hidden="true" />{s.text}</p>}
+      {!!data?.items.length && (
+        <ul className="devices">
+          {data.items.map((d) => (
+            <li key={d.id}>
+              <span>{String(d.name)}</span>
+              <span className="meta">{String(d.host)}</span>
+              <button type="button" onClick={() => onEdit(d)}>Ret</button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div><button type="button" onClick={() => onEdit({})}>Tilføj {spec.noun}</button></div>
+      {children}
+    </fieldset>
+  )
+}
+
+function DeviceForm({ spec, device, onClose, onSaved }: {
+  spec: DeviceSpec; device: Device; onClose: () => void; onSaved: () => void
+}) {
+  const [form, setForm] = useState<Record<string, string>>(
+    Object.fromEntries(spec.fields.map((f) => [f.key, String(device[f.key] ?? '')])))
+  const [problem, setProblem] = useState('')
+  const base = `/api/s/${spec.section}/config`
+
+  const run = async (path: string, method: string, body?: unknown) => {
+    try {
+      await api(path, { method, body })
+      onSaved()
+    } catch (exc) {
+      setProblem(exc instanceof Error ? exc.message : 'Det lykkedes ikke.')
+    }
+  }
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault()
+    void run(device.id ? `${base}/${device.id}` : base, device.id ? 'PUT' : 'POST', form)
+  }
+
+  return (
+    <Dialog title={device.id ? `Ret ${String(device.name)}` : `Tilføj ${spec.noun}`} onClose={onClose}>
+      <form onSubmit={submit}>
+        {spec.fields.map((f) => (
+          <label key={f.key}>{f.label}
+            <input type={f.secret ? 'password' : 'text'} autoComplete="off" required={!f.secret || !device.id} value={form[f.key]}
+              placeholder={f.secret && device.id ? 'Sat. Tom = uændret' : undefined}
+              onChange={(e) => setForm({ ...form, [f.key]: e.target.value })} />
+          </label>
+        ))}
+        {problem && <p className="problem">{problem}</p>}
+        <div className="dialog-actions">
+          {!!device.id && <button type="button" className="danger" onClick={() => void run(`${base}/${device.id}`, 'DELETE')}>Fjern</button>}
+          <button type="button" onClick={onClose}>Annullér</button>
+          <button type="submit" className="primary">Gem</button>
+        </div>
+      </form>
+    </Dialog>
+  )
+}
+
 function SetupPage({ onAuthLost }: { onAuthLost: () => void }) {
   const { data, reload } = usePoll<Setup>('/api/admin/setup', 0, onAuthLost)
   const [form, setForm] = useState<Record<string, unknown>>({})
   const [feeds, setFeeds] = useState<{ name: string; url: string }[]>([])
   const [message, setMessage] = useState('')
   const [problem, setProblem] = useState('')
+  const [editing, setEditing] = useState<{ spec: DeviceSpec; device: Device } | null>(null)
+  const [changed, setChanged] = useState(0)
 
   useEffect(() => {
     if (data) {
@@ -252,7 +364,7 @@ function SetupPage({ onAuthLost }: { onAuthLost: () => void }) {
   const save = async (e: React.FormEvent) => {
     e.preventDefault()
     const keys = ['publicUrl', 'timezone', 'homeName', 'homeLat', 'homeLon', 'googleClientId',
-      'dkliveUrl', 'dkliveLink', 'familylogUrl', 'nordnetMode']
+      'dkliveUrl', 'dkliveLink', 'familylogUrl', 'go2rtcUrl', 'nordnetMode']
     const body: Record<string, unknown> = {}
     for (const key of keys) if (!pins[key]) body[key] = form[key]
     for (const key of ['googleClientSecret', 'nordnetApiKey', 'youtubeApiKey']) {
@@ -271,6 +383,7 @@ function SetupPage({ onAuthLost }: { onAuthLost: () => void }) {
   }
 
   return (
+    <>
     <form className="setup" onSubmit={save}>
       <fieldset>
         <legend>Dashboardet</legend>
@@ -339,6 +452,15 @@ function SetupPage({ onAuthLost }: { onAuthLost: () => void }) {
         <p className="note">Sæsonplanen hentes fra Jolpica og kræver ingen opsætning.</p>
       </fieldset>
 
+      <Devices spec={PRINTERS} changed={changed} onAuthLost={onAuthLost} onEdit={(device) => setEditing({ spec: PRINTERS, device })}>
+        <p className="note">Bambu Lab-printere på jeres net. Dashboardet læser status direkte fra printeren og kan ikke styre den. IP-adresse, serienummer og LAN Access Code finder du i printerens indstillinger.</p>
+      </Devices>
+
+      <Devices spec={CAMERAS} changed={changed} onAuthLost={onAuthLost} onEdit={(device) => setEditing({ spec: CAMERAS, device })}>
+        <Field label="Adresse til go2rtc" name="go2rtcUrl" form={form} pins={pins} onChange={change} />
+        <p className="note">Tapo C200: opret en Camera Account i Tapo-appen under kameraet, Device Settings, Advanced Settings, Camera Account. Husk at give familien adgang under Brugere; sektionen er slået fra som standard.</p>
+      </Devices>
+
       <fieldset>
         <legend>Nordnet</legend>
         {status('aktier')}
@@ -360,5 +482,10 @@ function SetupPage({ onAuthLost }: { onAuthLost: () => void }) {
         <span className="meta">Version {data.version}</span>
       </div>
     </form>
+    {editing && (
+      <DeviceForm spec={editing.spec} device={editing.device} onClose={() => setEditing(null)}
+        onSaved={() => { setEditing(null); setChanged((n) => n + 1) }} />
+    )}
+    </>
   )
 }

@@ -7,10 +7,12 @@ import { readRoute, SECTIONS } from './core/routes'
 import type { User } from './core/types'
 import { useNow } from './core/usePoll'
 import { Overview } from './overview/Overview'
+import { Cameras } from './sections/Cameras'
 import { DkLive } from './sections/DkLive'
 import { LateNight } from './sections/LateNight'
 import { Links } from './sections/Links'
 import { LogMyLife } from './sections/LogMyLife'
+import { Printers } from './sections/Printers'
 import { Aktier, Calendar, F1, FamilyLog, News, NoAccess } from './sections/Simple'
 
 function useRoute() {
@@ -114,6 +116,8 @@ export function App() {
       {allowed && section?.id === 'familylog' && <FamilyLog user={user} onAuthLost={lost} />}
       {allowed && section?.id === 'f1' && <F1 onAuthLost={lost} />}
       {allowed && section?.id === 'latenight' && <LateNight user={user} onAuthLost={lost} />}
+      {allowed && section?.id === 'printers' && <Printers onAuthLost={lost} />}
+      {allowed && section?.id === 'cameras' && <Cameras onAuthLost={lost} />}
       {allowed && section?.id === 'links' && <Links onAuthLost={lost} />}
       {path === 'admin' && user.role === 'admin' && <Admin me={user} onAuthLost={lost} />}
     </div>

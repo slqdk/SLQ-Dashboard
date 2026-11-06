@@ -3,8 +3,8 @@
 Samme opskrift som FamilyLog: Docker i en Debian-LXC med `nesting=1,keyctl=1`,
 værtsport **8090**, Nginx Proxy Manager foran.
 
-> `proxmox/create-lxc.sh` og Docker-imaget er ikke kørt endnu. Der er hverken
-> Proxmox eller Docker i det miljø, de blev skrevet i.
+> `proxmox/create-lxc.sh`, Docker-imaget og go2rtc-imaget er ikke kørt endnu. Der
+> er hverken Proxmox eller Docker i det miljø, de blev skrevet i.
 
 ## 1. Opret containeren
 
@@ -19,8 +19,28 @@ Scriptet opretter en LXC (2 kerner, 1 GB RAM, 16 GB disk, starter sammen med
 værten), installerer Docker, kloner repo'et til `/opt/slq-dashboard` og starter
 appen. Første build tager et par minutter.
 
-Hvis repo'et er privat, skal LXC'en bruge en deploy key, ligesom FamilyLog
-(`docs/CONTAINER.md` i FamilyLog).
+### Hvis containeren allerede findes
+
+På Proxmox-værten (noden → Shell), med containerens nummer:
+
+```bash
+pct set 109 --features nesting=1,keyctl=1 --onboot 1
+pct reboot 109
+pct enter 109
+```
+
+`pct enter` giver en root-shell i containeren uden kode, og `exit` fører tilbage
+til værten. Inde i containeren:
+
+```bash
+apt-get update
+apt-get install -y curl git python3 ca-certificates
+curl -fsSL https://get.docker.com | sh
+git clone https://github.com/slqdk/SLQ-Dashboard.git /opt/slq-dashboard
+cd /opt/slq-dashboard
+bash update.sh compose up -d --build
+hostname -I
+```
 
 ## 2. Første gang
 
@@ -53,7 +73,31 @@ Kræver FamilyLog 0.5.0. Sæt adressen under **Admin → Opsætning → FamilyLo
 en læsenøgle pr. person i FamilyLog under **Settings → Accounts → Read key**, og
 sæt den ind under **Admin → Brugere → Ret**. Nøglen vises kun én gang.
 
-## 6. Opdatering og backup
+## 6. Printere
+
+Bambu Lab-printere sættes op under **Admin → Opsætning → Printere**: navn,
+IP-adresse, serienummer og LAN Access Code. De tre sidste finder du i printerens
+indstillinger. Giv printeren en fast adresse i routeren. Dashboardet læser kun, og
+forbindelsen går direkte til printeren uden om Bambus sky.
+
+Afviser printeren forbindelsen, så prøv med LAN-tilstand eller Developer Mode på
+printeren. Det er ikke afprøvet på en rigtig printer endnu.
+
+## 7. Kameraer
+
+Opret først en **Camera Account** i Tapo-appen: kameraet → Device Settings →
+Advanced Settings → Camera Account. Giv kameraet en fast adresse i routeren.
+
+Tilføj det under **Admin → Opsætning → Kameraer** med navn, IP-adresse, brugernavn
+og adgangskode. Vælg så under **Admin → Brugere**, hvem der må se kameraerne.
+Sektionen er slået fra for familien som standard.
+
+Billederne går gennem containeren `go2rtc`, som compose starter ved siden af appen.
+Den har ingen åben port, så alt går gennem dashboardets login. Den gemmer ikke
+kameraernes login på disken: dashboardet sender det igen, hvis den genstarter.
+Det er afprøvet med go2rtc og en testkilde, men ikke på et rigtigt C200 endnu.
+
+## 8. Opdatering og backup
 
 ```bash
 cd /opt/slq-dashboard

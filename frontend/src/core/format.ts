@@ -52,6 +52,13 @@ export function until(iso: string, now = Date.now()): string {
   return `om ${Math.floor(hours / 24)} dage`
 }
 
+/** Minutes as a person says them. */
+export function duration(min: number): string {
+  const hours = Math.floor(min / 60)
+  if (!hours) return `${min} min`
+  return min % 60 ? `${hours} t ${min % 60} min` : `${hours} t`
+}
+
 const number = (digits: number) =>
   new Intl.NumberFormat(da, { minimumFractionDigits: digits, maximumFractionDigits: digits })
 

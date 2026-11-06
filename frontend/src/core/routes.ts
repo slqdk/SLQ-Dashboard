@@ -9,6 +9,8 @@ export const SECTIONS: { id: string; path: string; title: string }[] = [
   { id: 'familylog', path: 'familylog', title: 'FamilyLog' },
   { id: 'f1', path: 'formel-1', title: 'Formel 1' },
   { id: 'latenight', path: 'slq-dl', title: 'SLQ DL' },
+  { id: 'printers', path: 'printere', title: 'Printere' },
+  { id: 'cameras', path: 'kameraer', title: 'Kameraer' },
   { id: 'links', path: 'links', title: 'Links' },
 ]
 

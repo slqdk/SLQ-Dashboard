@@ -1,6 +1,7 @@
 // A walk through the running app in a real browser, against the mock upstreams.
-// Needs the app on $BASE with tools/mock_upstreams.py behind it, and an empty
-// data folder (it creates the first account).
+// Needs the app on $BASE with tools/mock_upstreams.py behind it and
+// tools/mock_printer.py on $PRINTER, and an empty data folder (it creates the
+// first account).
 //
 //   BASE=http://127.0.0.1:8090 SHOTS=/tmp/shots node tools/browser_check.mjs
 import { createRequire } from 'node:module'
@@ -11,6 +12,7 @@ const { chromium } = require('playwright')
 
 const BASE = process.env.BASE ?? 'http://127.0.0.1:8090'
 const MOCK = process.env.MOCK ?? 'http://127.0.0.1:9100'
+const PRINTER = process.env.PRINTER ?? '127.0.0.1:9101'
 const SHOTS = process.env.SHOTS ?? ''
 const WIDTH = Number(process.env.WIDTH ?? 1600)
 if (SHOTS) mkdirSync(SHOTS, { recursive: true })
@@ -27,8 +29,8 @@ const page = await context.newPage()
 const problems = []
 page.on('pageerror', (e) => problems.push(`pageerror: ${e.message}`))
 page.on('console', (m) => {
-  // The check provokes 400, 401 and 403 on purpose.
-  if (m.type() === 'error' && !/favicon|status of 40[013]/.test(m.text())) problems.push(`console: ${m.text()}`)
+  // The check provokes 400, 401, 403 and 503 on purpose.
+  if (m.type() === 'error' && !/favicon|status of (40[013]|503)/.test(m.text())) problems.push(`console: ${m.text()}`)
 })
 
 const shot = async (name) => {
@@ -64,6 +66,28 @@ await page.click('button:has-text("Gem opsætning")')
 await page.waitForSelector('text=Gemt.')
 check(true, 'setup saved')
 check(await page.locator('input[disabled]').count() >= 3, 'values pinned by the container show locked')
+
+const fillDevice = async (fields) => {
+  for (const [label, value] of Object.entries(fields)) await page.locator('dialog').getByLabel(label, { exact: true }).fill(value)
+  await page.click('dialog button:has-text("Gem")')
+}
+await page.click('button:has-text("Tilføj printer")')
+await fillDevice({ Navn: 'P1S', 'IP-adresse': 'printer/1', Serienummer: '01S00C000000001', 'LAN Access Code': 'forkert' })
+await page.waitForSelector('dialog .problem')
+check(true, 'a printer address with a slash refused')
+await fillDevice({ 'IP-adresse': PRINTER })
+await page.waitForSelector('text=Printeren afviste adgangskoden.', { timeout: 15_000 })
+check(true, 'a wrong access code is said in words')
+await page.click('.devices li:has-text("P1S") button:has-text("Ret")')
+check(await page.inputValue('dialog input[type="password"]') === '', 'the access code does not come back')
+await fillDevice({ 'LAN Access Code': '12345678' })
+await page.waitForSelector('text=1 af 1 svarer.', { timeout: 15_000 })
+check(true, 'the printer answers')
+await page.click('button:has-text("Tilføj kamera")')
+await fillDevice({ Navn: 'Indkørsel', 'IP-adresse': '192.0.2.20', 'Brugernavn fra Camera Account': 'tapo', 'Adgangskode fra Camera Account': 'p@ss/w:rd' })
+await page.waitForSelector('.devices li:has-text("Indkørsel")')
+await page.waitForSelector('text=go2rtc svarer, 1 kamera sat op.', { timeout: 15_000 })
+check(true, 'the camera is set up')
 await shot('admin-setup')
 
 await page.click('.segmented button:has-text("Brugere")')
@@ -76,6 +100,7 @@ await page.waitForSelector('tbody th:has-text("Mor")')
 check(true, 'family member created')
 const aktier = page.locator('input[aria-label="mor: Aktier"]')
 check(!(await aktier.isChecked()), 'Aktier is off by default for family')
+check(!(await page.locator('input[aria-label="mor: Kameraer"]').isChecked()), 'Kameraer is off by default for family')
 await shot('admin-users')
 
 // ---- Google, through the mock ------------------------------------------------------
@@ -164,6 +189,24 @@ await page.waitForSelector('.updates li')
 check(await page.locator('.prices tbody tr').count() > 10, 'DK live shows prices')
 await shot('dk-live')
 
+await go('printere')
+await page.waitForSelector('.printer-percent')
+check(/\d+ %/.test(await page.textContent('.printer-percent')), 'Printere shows the progress')
+check((await page.textContent('.printer')).includes('beslag-v3.3mf'), 'and the file')
+await shot('printere')
+
+await go('kameraer')
+await page.waitForFunction(() => document.querySelector('.cam-frame img')?.naturalWidth > 0)
+check(true, 'Kameraer shows a picture')
+const first = await page.getAttribute('.cam-frame img', 'src')
+await page.waitForFunction((src) => document.querySelector('.cam-frame img').getAttribute('src') !== src, first, { timeout: 8000 })
+check(true, 'the picture is renewed')
+await shot('kameraer')
+await page.click('.cam')
+await page.waitForSelector('dialog:has-text("Live-videoen kører ikke")', { timeout: 8000 })
+check(await page.locator('dialog .cam-frame img').count() === 1, 'no live video falls back to pictures')
+await page.click('dialog button:has-text("Luk")')
+
 await go('aktier')
 await page.waitForSelector('text=ikke forbundet')
 await shot('aktier')
@@ -174,11 +217,14 @@ await shot('familylog')
 await go('')
 await page.waitForSelector('.band svg')
 await page.waitForSelector('.block:has-text("Nyheder") .headlines li')
-for (const title of ['Kalender', 'DK live', 'Nyheder', 'SLQ DL', 'Formel 1', 'LogMyLife', 'Links', 'Aktier', 'FamilyLog']) {
+for (const title of ['Kalender', 'DK live', 'Nyheder', 'SLQ DL', 'Formel 1', 'LogMyLife', 'Links', 'Aktier', 'FamilyLog', 'Printere', 'Kameraer']) {
   check(await page.locator(`.block h2:has-text("${title}")`).count() === 1, `overview has ${title}`)
 }
 check(/\d\d:\d\d/.test(await page.textContent('.hero-clock time')), 'the clock shows')
 check((await page.textContent('.block:has-text("Links")')).includes('Infosys'), 'pinned link on the overview')
+check((await page.textContent('.digest')).includes('P1S er færdig kl.'), 'the digest knows when the print is done')
+await page.waitForFunction(() => document.querySelector('.block .cam-frame img')?.naturalWidth > 0)
+check(true, 'a camera on the overview')
 await page.waitForFunction(() => /\d+ ms/.test(document.querySelector('.ping-button')?.textContent ?? ''))
 check(true, 'ping shows milliseconds')
 await page.waitForTimeout(300)
@@ -203,8 +249,13 @@ await page.waitForSelector('.hero h1')
 check(await page.locator('.nav nav a:has-text("Admin")').count() === 0, 'family has no Admin')
 check(await page.locator('.nav nav a:has-text("Aktier")').count() === 0, 'family has no Aktier')
 check(await page.locator('.block h2:has-text("Aktier")').count() === 0, 'nor on the overview')
+check(await page.locator('.nav nav a:has-text("Kameraer")').count() === 0, 'family has no Kameraer')
+check(await page.locator('.block h2:has-text("Kameraer")').count() === 0, 'nor on the overview')
+check(await page.locator('.block h2:has-text("Printere")').count() === 1, 'but family has Printere')
 const denied = await page.evaluate(async () => (await fetch('/api/s/aktier/state')).status)
 check(denied === 403, 'the API refuses a section the account does not have')
+const cameraDenied = await page.evaluate(async () => (await fetch('/api/s/cameras/1/frame.jpg')).status)
+check(cameraDenied === 403, 'the API refuses a camera picture too')
 const adminDenied = await page.evaluate(async () => (await fetch('/api/admin/users')).status)
 check(adminDenied === 403, 'the API refuses Admin to family')
 await shot('family-overview')

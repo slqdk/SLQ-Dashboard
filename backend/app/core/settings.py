@@ -45,6 +45,8 @@ DEFAULTS: dict = {
     "newsFeeds": DEFAULT_FEEDS,
     # ---- SLQ DL ----
     "youtubeApiKey": "",        # optional; never sent back to the browser
+    # ---- Kameraer ----
+    "go2rtcUrl": "",            # the compose file sets this
     # ---- Aktier ----
     "nordnetMode": "off",       # off | api | csv
     "nordnetApiKey": "",        # never sent back to the browser
@@ -58,10 +60,11 @@ ENV_OVERRIDES = {
     "dkliveUrl": "APP_DKLIVE_URL",
     "dkliveLink": "APP_DKLIVE_LINK",
     "familylogUrl": "APP_FAMILYLOG_URL",
+    "go2rtcUrl": "APP_GO2RTC_URL",
 }
 
 SECRET_KEYS = {"googleClientSecret", "nordnetApiKey", "youtubeApiKey"}
-URL_KEYS = {"publicUrl", "dkliveUrl", "dkliveLink", "familylogUrl"}
+URL_KEYS = {"publicUrl", "dkliveUrl", "dkliveLink", "familylogUrl", "go2rtcUrl"}
 TEXT_KEYS = {"googleClientId", "homeName"}
 NORDNET_MODES = ("off", "api", "csv")
 MAX_FEEDS = 8

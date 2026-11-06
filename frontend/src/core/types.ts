@@ -184,6 +184,31 @@ export interface Folder {
   name: string
 }
 
+export interface PrinterState {
+  id: number
+  name: string
+  online: boolean
+  problem: string
+  state: string
+  stateText: string
+  active: boolean
+  percent: number | null
+  remainingMin: number | null
+  layer: number | null
+  totalLayers: number | null
+  nozzle: number | null
+  nozzleTarget: number | null
+  bed: number | null
+  bedTarget: number | null
+  file: string
+  error: string
+}
+
+export interface CameraItem {
+  id: number
+  name: string
+}
+
 export interface Overview {
   serverTime: string
   blocks: {
@@ -196,6 +221,8 @@ export interface Overview {
     f1?: F1Block
     latenight?: LateNightBlock
     links?: { pinned: LinkItem[]; total: number }
+    printers?: { printers: PrinterState[] }
+    cameras?: { cameras: CameraItem[] }
   }
 }
 

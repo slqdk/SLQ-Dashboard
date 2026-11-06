@@ -13,13 +13,19 @@ Proxmox LXC. **Read `docs/PLAN.md` first: decisions, what is built, what is open
   the middleware in `main.py`. Registry: `sections/__init__.py`.
 - `frontend/src/` — React + TypeScript + Vite. `overview/` is the front page,
   `sections/` one component per section, `admin/` users and setup.
-- `tools/mock_upstreams.py` — stand-ins for dk-live, Jolpica, RSS and Google.
+- `tools/mock_upstreams.py` — stand-ins for dk-live, Jolpica, RSS, Google and go2rtc.
+  `tools/mock_printer.py` — a stand-in Bambu printer, real TLS and MQTT.
   `tools/browser_check.mjs` — a walk through the app in a real browser.
 
 ## Rules that must hold
 - **Google is read only.** One scope, `calendar.readonly`. Nothing writes to Google.
 - **FamilyLog is read only.** `sections/familylog/client.py` only ever uses GET;
   a test parses the file to hold it to that.
+- **Printers are read only.** `sections/printers/watcher.py` publishes one thing,
+  `pushall`, and at most every five minutes; a test parses the file to hold it to that.
+- **Camera logins stay in memory.** Streams go to go2rtc with PATCH, never PUT, which
+  writes them to its config file. go2rtc has no published port, so every picture
+  passes the dashboard's login. Pass on an httpx error's type, never its text.
 - **LogMyLife remembers.** Nothing from a source is deleted: a row deleted at the
   source gets `deleted_at_source`. Sections add to the log through `store.ingest`,
   which is safe to repeat.

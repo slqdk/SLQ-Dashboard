@@ -1,5 +1,7 @@
 fastapi>=0.111
 uvicorn[standard]>=0.30
 httpx>=0.27
-# Google refresh tokens and FamilyLog read keys at rest (core/vault.py).
+# Refresh tokens, read keys and device passwords at rest (core/vault.py).
 cryptography>=42
+# Printere: status from Bambu Lab printers over local MQTT.
+paho-mqtt>=2.0

@@ -3,10 +3,13 @@ import { hrefOf } from '../core/routes'
 import { useNow, usePoll } from '../core/usePoll'
 import type { DkLive, LifeEvent, LiveUpdate, Overview as Data, User } from '../core/types'
 import { DayBand } from './DayBand'
+import { CameraFrame } from '../sections/Cameras'
 import { Updates } from '../sections/DkLive'
 import { factWhen, MonologueList } from '../sections/LateNight'
+import { finishesAt, PrinterLines } from '../sections/Printers'
 
 const LIVE_SECONDS = 30
+const CAMERA_SECONDS = 30
 
 function Block({ id, title, className, children }: {
   id: string; title: string; className?: string; children: React.ReactNode
@@ -32,6 +35,10 @@ function digest(data: Data | null, now: Date): string {
   const f = b.f1?.next
   if (f && new Date(f.start).getTime() - now.getTime() < 48 * 3_600_000) {
     parts.push(`${f.name} til ${f.meeting.replace(' Grand Prix', ' GP')} ${dayName(f.start.slice(0, 10), now).toLowerCase()} kl. ${clock(f.start)}.`)
+  }
+  for (const printer of b.printers?.printers ?? []) {
+    const done = finishesAt(printer, now)
+    if (done) parts.push(`${printer.name} er færdig kl. ${clock(done)}.`)
   }
   return parts.join(' ')
 }
@@ -248,6 +255,25 @@ export function Overview({ user, onAuthLost }: { user: User; onAuthLost: () => v
             ) : (
               <p className="empty">{b.familylog.connected ? 'Forbundet, kun læsning.' : 'Mangler læsenøgle.'}</p>
             )}
+          </Block>
+        )}
+
+        {!!b.cameras?.cameras.length && (
+          <Block id="cameras" title="Kameraer" className="w8">
+            <div className="cameras small">
+              {b.cameras.cameras.map((c) => (
+                <a key={c.id} className="cam" href={hrefOf('cameras')}>
+                  <CameraFrame camera={c} seconds={CAMERA_SECONDS} />
+                  <span>{c.name}</span>
+                </a>
+              ))}
+            </div>
+          </Block>
+        )}
+
+        {!!b.printers?.printers.length && (
+          <Block id="printers" title="Printere" className="w4">
+            <PrinterLines printers={b.printers.printers} now={now} />
           </Block>
         )}
       </div>
