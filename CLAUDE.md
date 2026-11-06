@@ -1,0 +1,43 @@
+# CLAUDE.md — SLQ Dashboard
+
+Søren's private start page: an overview with info from every section, and a page
+per section. Desktop first; phones only have to work. Runs as Docker in its own
+Proxmox LXC. **Read `docs/PLAN.md` first: decisions, what is built, what is open.**
+
+## Layout
+- `backend/app/core/` — FamilyLog's shell (db, migrations, auth, settings, logs)
+  plus `jobs` (background threads), `vault` (per-person secrets), `google`
+  (read-only OAuth + Calendar), `netwatch` (the server half of the ping indicator).
+- `backend/app/sections/<id>/` — one package per section, each exporting `SECTION`
+  (see `core/sections.py`). API under `/api/s/<id>/`; access is checked once, in
+  the middleware in `main.py`. Registry: `sections/__init__.py`.
+- `frontend/src/` — React + TypeScript + Vite. `overview/` is the front page,
+  `sections/` one component per section, `admin/` users and setup.
+- `tools/mock_upstreams.py` — stand-ins for dk-live, Jolpica, RSS and Google.
+  `tools/browser_check.mjs` — a walk through the app in a real browser.
+
+## Rules that must hold
+- **Google is read only.** One scope, `calendar.readonly`. Nothing writes to Google.
+- **FamilyLog is read only.** `sections/familylog/client.py` only ever uses GET;
+  a test parses the file to hold it to that.
+- **LogMyLife remembers.** Nothing from a source is deleted: a row deleted at the
+  source gets `deleted_at_source`. Sections add to the log through `store.ingest`,
+  which is safe to repeat.
+- **`overview()` never calls an upstream.** It reads the database or a job's cache,
+  so the page always answers at once.
+- **No secrets to the browser or the log.** Settings secrets go through
+  `settings.public()`; per-person tokens through `core/vault.py`.
+- **No ads, images or trackers from news feeds.** Plain text only, paid items dropped.
+- Every SLQ DL fact in `seed.json` has a source. Don't add one from memory.
+- Migrations only add; never renumber one that has run.
+
+## Conventions
+UI text is Danish; identifiers, comments and these docs English. Colour carries
+meaning only. Chart colours are checked with the dataviz palette validator.
+
+## Verify a change
+```
+cd backend && pip install -r requirements-dev.txt && python -m pytest -q
+cd frontend && npm ci && npm test && npm run build
+# real browser: run the app with the mock upstreams, see tools/browser_check.mjs
+```

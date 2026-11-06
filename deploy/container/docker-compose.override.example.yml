@@ -1,0 +1,15 @@
+# Your own settings for the container. Copy this file to
+# docker-compose.override.yml next to it and edit that copy - git ignores it,
+# so the clone stays clean and update.sh can always fast-forward.
+# Everything can also be set in Admin → Opsætning; a value pinned here shows
+# locked there. Keep secrets here or in Admin, never in the repo.
+services:
+  app:
+    environment:
+      APP_PUBLIC_URL: "https://dashboard.slq.dk"
+      # APP_DKLIVE_URL: "http://<lxc-ip>:4200"
+      # APP_FAMILYLOG_URL: "http://30.11.0.108:8081"
+    # A folder on the host instead of the named volume. It must be owned by
+    # uid 1000:  mkdir -p /srv/slq-dashboard/data && chown -R 1000:1000 /srv/slq-dashboard/data
+    # volumes:
+    #   - /srv/slq-dashboard/data:/data

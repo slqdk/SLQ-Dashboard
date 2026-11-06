@@ -1,0 +1,35 @@
+import { describe, expect, it } from 'vitest'
+import { ago, dayKey, dayName, kr, localDate, until } from './format'
+
+const now = new Date(2026, 10, 6, 7, 15) // Friday 6 November
+
+describe('dayName', () => {
+  it('names the near days', () => {
+    expect(dayName('2026-11-06', now)).toBe('I dag')
+    expect(dayName('2026-11-07', now)).toBe('I morgen')
+    expect(dayName('2026-11-08', now)).toBe('Søndag')
+  })
+  it('falls back to a date from a week out', () => {
+    expect(dayName('2026-11-20', now)).toMatch(/20\. nov/)
+  })
+})
+
+describe('times', () => {
+  it('counts back and forth', () => {
+    const t = now.getTime()
+    expect(ago(new Date(t - 30_000).toISOString(), t)).toBe('lige nu')
+    expect(ago(new Date(t - 5 * 60_000).toISOString(), t)).toBe('5 min')
+    expect(ago(new Date(t - 3 * 3_600_000).toISOString(), t)).toBe('3 t')
+    expect(until(new Date(t + 90 * 60_000).toISOString(), t)).toBe('om 1 t 30 min')
+    expect(until(new Date(t - 1000).toISOString(), t)).toBe('i gang')
+  })
+  it('keeps a date-only string on its own day', () => {
+    expect(dayKey(localDate('2026-01-01'))).toBe('2026-01-01')
+  })
+})
+
+describe('kr', () => {
+  it('uses a Danish decimal comma', () => {
+    expect(kr(2.427)).toBe('2,43')
+  })
+})
