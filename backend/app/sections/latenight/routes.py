@@ -6,7 +6,7 @@ from datetime import date
 
 from fastapi import APIRouter, HTTPException, Request
 
-from . import store
+from . import monologues, store
 
 router = APIRouter(prefix="/api/s/latenight", tags=["latenight"])
 
@@ -22,6 +22,11 @@ def on_date(day: str | None = None):
         return store.on_date(date.fromisoformat(day) if day else None)
     except ValueError:
         raise HTTPException(400, "Ugyldig dato.")
+
+
+@router.get("/monologues")
+def newest():
+    return {"items": monologues.newest(), "status": monologues.status()}
 
 
 @router.get("/facts")

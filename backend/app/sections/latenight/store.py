@@ -175,4 +175,5 @@ def delete(fact_id: int) -> None:
 
 
 def overview(_me: dict) -> dict:
-    return {**on_date(), "total": meta()["total"]}
+    from . import monologues
+    return {**on_date(), "total": meta()["total"], "monologues": monologues.newest(3)}

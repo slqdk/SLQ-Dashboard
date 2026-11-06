@@ -489,3 +489,204 @@ def test_only_admin_changes_facts(client, family):
 def test_a_fact_source_must_be_a_web_address(client):
     body = {"date": "1999-01-01", "title": "Test", "sourceUrl": "javascript:alert(1)"}
     assert client.post("/api/s/latenight/facts", json=body).status_code == 400
+
+
+# ---- FamilyLog, the sync ------------------------------------------------------------
+
+def test_dagbog_day_becomes_a_timeline_entry():
+    from app.sections.familylog.client import dagbog_fields
+    f = dagbog_fields({"day": "2026-11-01", "mood": 4, "mental": 7, "tags": ["Sport"], "highlight": "God tur\nMed børnene"})
+    assert f["title"] == "God tur" and f["all_day"] is True
+    assert "Med børnene" in f["description"] and "Humør 4 af 5" in f["description"] and "Sport" in f["description"]
+    assert dagbog_fields({"day": "2026-11-02", "mood": 3})["title"] == "Dagbog, humør 3 af 5"
+    assert dagbog_fields({"mood": 3}) is None
+
+
+def test_review_lands_on_the_day_of_the_visit():
+    from app.sections.familylog.client import review_fields
+    f = review_fields({"visitedOn": "2026-06-01", "placeName": "Legeland", "text": " Fint ", "createdAt": "2026-07-01T10:00:00"})
+    assert (f["start"], f["title"], f["description"], f["location"]) == ("2026-06-01", "Besøg: Legeland", "Fint", "Legeland")
+    assert review_fields({"placeName": "X", "createdAt": "2026-07-01T10:00:00"})["start"] == "2026-07-01"
+
+
+class _FakeFamilyLog:
+    """Stands in for client.get. Records the paths, so a test sees what is read."""
+
+    def __init__(self, days, reviews=(), economy=True):
+        self.days, self.reviews, self.economy, self.calls = list(days), list(reviews), economy, []
+
+    def __call__(self, _user, path, params=None):
+        self.calls.append((path, params))
+        if path == "/api/read/me":
+            return {"id": 42, "username": "x", "name": ""}
+        if path == "/api/okonomi/state":
+            return {"access": self.economy}
+        if path == "/api/okonomi/overview":
+            return {"spent": 1234.5, "income": 100, "count": 7, "categories": [{"name": "Mad", "spent": 500}]}
+        if path == "/api/fm/me/reviews":
+            return self.reviews
+        if path == "/api/dagbog/person":
+            before = (params or {}).get("before")
+            rows = [d for d in self.days if not before or d["day"] < before]
+            page = rows[:params["limit"]]
+            return {"entries": page, "more": len(rows) > len(page)}
+        raise AssertionError(path)
+
+
+def test_sync_reads_everything_once_then_stops_early(client, monkeypatch):
+    from app.sections.familylog import client as fl
+    from app.sections.logmylife import store
+    uid = _me(client)
+    days = [{"day": (date(2026, 11, 1) - timedelta(days=i)).isoformat(), "mood": 3} for i in range(150)]
+    fake = _FakeFamilyLog(days, [{"id": 5, "placeName": "Legeland", "visitedOn": "2026-06-01", "text": ""}])
+    monkeypatch.setattr(fl, "get", fake)
+    first = fl.sync_user(uid)
+    assert first["added"] == 151 and first["error"] == ""
+    assert first["month"]["spent"] == 1234.5
+    assert store.stats(uid)["bySource"] == {"familylog.dagbog": 150, "familylog.familymap": 1}
+    assert [p for p, _ in fake.calls].count("/api/dagbog/person") == 3
+    fake.calls.clear()
+    assert fl.sync_user(uid)["added"] == 0
+    assert [p for p, _ in fake.calls].count("/api/dagbog/person") == 1
+    assert fake.calls[1][0] == "/api/okonomi/state"
+    assert next(p for p, _ in fake.calls if p == "/api/dagbog/person")
+    assert all(p != "/api/dagbog/person" or a["user"] == 42 for p, a in fake.calls)
+
+
+def test_a_person_without_okonomi_still_syncs(client, monkeypatch):
+    from app.sections.familylog import client as fl
+    monkeypatch.setattr(fl, "get", _FakeFamilyLog([], economy=False))
+    out = fl.sync_user(_me(client))
+    assert out["month"] is None and out["error"] == ""
+
+
+def test_overview_shows_the_month_without_calling_familylog(client, monkeypatch):
+    from app.sections.familylog import client as fl
+    uid = _me(client)
+    monkeypatch.setattr(fl, "get", _FakeFamilyLog([]))
+    fl.sync_user(uid)
+
+    def nope(*_a, **_k):
+        raise AssertionError("the overview must not call an upstream")
+
+    monkeypatch.setattr(fl, "get", nope)
+    assert client.get("/api/overview").json()["blocks"]["familylog"]["month"]["spent"] == 1234.5
+
+
+def test_search_skips_okonomi_when_the_person_has_none(client, monkeypatch):
+    from app.sections.familylog import client as fl
+
+    def get(_u, path, _p=None):
+        if "okonomi" in path:
+            raise fl.Refused(path)
+        return [{"id": 1, "name": "Legeland", "address": "Vej 1"}]
+
+    monkeypatch.setattr(fl, "get", get)
+    out = client.get("/api/s/familylog/search?q=lege").json()
+    assert out["transactions"] is None and out["places"][0]["name"] == "Legeland"
+
+
+# ---- SLQ DL, the monologues ---------------------------------------------------------
+
+@pytest.mark.parametrize("show,title,keep", [
+    ("kimmel", "Trump Rants & Raves About the Least Important Things Ever", True),
+    ("kimmel", "Jimmy Kimmel Breaks Down Midterm Election Results, Trump Loses Bigly", True),
+    ("kimmel", "Timothy Simons on Major Soup Fail, Getting into Politics", False),
+    ("kimmel", "Pod Save America Hosts on Midterm Results", False),
+    ("kimmel", "Cage the Elephant – Make It Easy", False),
+    ("fallon", "Trump's Cabinet Distances Themselves from Him After Midterms | The Tonight Show", True),
+    ("fallon", "Memory Drawing Challenge with Carrie Coon | The Tonight Show Starring Jimmy Fallon", False),
+    ("fallon", "Chef Anthony Vitolo Cooks His Classic Spaghetti Pomodoro with Jimmy | The Tonight Show", False),
+    ("fallon", "Ethan Hawke Talks Attending Maya Hawke's Wedding", False),
+    ("meyers", "Trump Soothes Himself with Renovations After Midterms: A Closer Look", True),
+    ("meyers", "John Malkovich Talks Wild Horse Nine with Sam Rockwell", False),
+    ("daily", "Trump Reacts to Midterm Defeat by Focusing on the Ballroom | The Daily Show", True),
+    ("daily", "Teddy Schleifer on Elon Musk's $500M Election Flop | The Daily Show", False),
+    ("daily", "Min Jin Lee - Family, Education & Sacrifice | The Daily Show", False),
+    ("oliver", "Generic Drugs: Last Week Tonight with John Oliver (HBO)", True),
+    ("oliver", "S13 E26: Kimberly Guilfoyle & Generic Drugs: 10/11/26: Last Week Tonight with John Oliver", False),
+])
+def test_what_counts_as_a_monologue(show, title, keep):
+    from app.sections.latenight.monologues import SHOWS
+    assert next(s for s in SHOWS if s["id"] == show)["keep"](title) is keep
+
+
+FEED = """<?xml version="1.0"?><feed xmlns:yt="http://www.youtube.com/xml/schemas/2015" xmlns="http://www.w3.org/2005/Atom">
+<entry><yt:videoId>abc</yt:videoId><title>Trump Does It Again</title><published>2026-11-05T05:00:00+00:00</published></entry>
+<entry><yt:videoId>def</yt:videoId><title>Bill Hader on His New Film</title><published>2026-11-05T06:00:00+00:00</published></entry>
+</feed>"""
+
+
+def test_the_feed_and_the_api_give_the_same_thing():
+    from app.sections.latenight import monologues as m
+    show = m.SHOWS[0]
+    feed = m.parse_feed(FEED, show)
+    assert feed == [{"show": "Jimmy Kimmel Live", "title": "Trump Does It Again",
+                     "at": "2026-11-05T05:00:00+00:00", "url": "https://www.youtube.com/watch?v=abc"}]
+    api = m.parse_api({"items": [{"snippet": {"title": "Trump Does It Again", "publishedAt": "2026-11-05T05:00:00+00:00",
+                                              "resourceId": {"videoId": "abc"}}}]}, show)
+    assert api == feed
+
+
+def test_an_outage_keeps_the_last_list_and_says_so(client, monkeypatch):
+    import httpx
+
+    from app.sections.latenight import monologues as m
+    m._items["kimmel"] = [{"show": "x", "title": "Gammel", "url": "https://y", "at": "2026-11-01T00:00:00Z"}]
+
+    def down(*_a, **_k):
+        raise httpx.ConnectError("nede")
+
+    monkeypatch.setattr(m, "fetch", down)
+    m.job()
+    assert m.newest()[0]["title"] == "Gammel"
+    assert m.status()["ok"] is False and "API-nøgle" in m.status()["text"]
+    assert client.get("/api/overview").json()["blocks"]["latenight"]["monologues"][0]["title"] == "Gammel"
+
+
+def test_youtube_key_is_a_secret(client):
+    client.put("/api/admin/setup", json={"youtubeApiKey": "AIzaHemmelig12345"})
+    assert "AIzaHemmelig" not in client.get("/api/admin/setup").text
+    assert client.get("/api/admin/setup").json()["settings"]["youtubeApiKeySet"] is True
+
+
+# ---- LogMyLife, Strava ---------------------------------------------------------------
+
+STRAVA = (
+    "Activity ID,Activity Date,Activity Name,Activity Type,Activity Description,Elapsed Time,Distance,Elapsed Time,Distance\n"
+    '123,"Mar 4, 2021, 5:47:48 PM",Morgenløb,Run,Koldt,3120,"10.21",3120.0,10210.0\n'
+    '124,"Jun 9, 2022, 7:02:11 AM",Tur til Kolding,Ride,,5400,"31.5",5400.0,31500.0\n'
+    ',"ikke en række",,,,,,,\n'
+).encode("utf-8")
+
+
+def test_strava_export_lands_on_the_timeline(client):
+    r = client.post("/api/s/logmylife/import/strava", content=STRAVA)
+    assert r.status_code == 200
+    assert r.json() == {"added": 2, "updated": 0, "same": 0, "skipped": 1}
+    events = client.get("/api/s/logmylife/events?source=strava").json()["events"]
+    assert [e["title"] for e in events] == ["Tur til Kolding", "Morgenløb"]
+    run = events[1]
+    assert run["start"] == "2021-03-04T17:47:48Z" and run["end"] == "2021-03-04T18:39:48Z"
+    assert run["description"] == "Løb, 10,2 km, 52 min\nKoldt" and run["category"] == "Fritid"
+
+
+def test_importing_again_adds_nothing(client):
+    client.post("/api/s/logmylife/import/strava", content=STRAVA)
+    r = client.post("/api/s/logmylife/import/strava", content=STRAVA).json()
+    assert r["added"] == 0 and r["same"] == 2
+
+
+def test_a_strava_entry_stays_the_persons_own(client, family):
+    client.post("/api/s/logmylife/import/strava", content=STRAVA)
+    assert family.get("/api/s/logmylife/events?source=strava").json()["events"] == []
+
+
+def test_another_language_gets_a_clear_message(client):
+    r = client.post("/api/s/logmylife/import/strava", content="Aktivitets-id,Dato\n1,2\n".encode())
+    assert r.status_code == 400 and "English" in r.json()["detail"]
+
+
+def test_a_zip_gets_a_clear_message(client):
+    r = client.post("/api/s/logmylife/import/strava", content=b"PK\x03\x04\xff\xfe\x00")
+    assert r.status_code == 400 and "zip" in r.json()["detail"]

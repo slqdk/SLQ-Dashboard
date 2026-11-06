@@ -255,7 +255,7 @@ function SetupPage({ onAuthLost }: { onAuthLost: () => void }) {
       'dkliveUrl', 'dkliveLink', 'familylogUrl', 'nordnetMode']
     const body: Record<string, unknown> = {}
     for (const key of keys) if (!pins[key]) body[key] = form[key]
-    for (const key of ['googleClientSecret', 'nordnetApiKey']) {
+    for (const key of ['googleClientSecret', 'nordnetApiKey', 'youtubeApiKey']) {
       if (form[key] && !pins[key]) body[key] = form[key]
     }
     body.newsFeeds = feeds.filter((f) => f.url.trim())
@@ -324,6 +324,13 @@ function SetupPage({ onAuthLost }: { onAuthLost: () => void }) {
           </div>
         ))}
         <button type="button" onClick={() => setFeeds([...feeds, { name: '', url: '' }])}>Tilføj kilde</button>
+      </fieldset>
+
+      <fieldset>
+        <legend>SLQ DL</legend>
+        {status('latenight')}
+        <Secret label="YouTube API-nøgle, valgfri" name="youtubeApiKey" setup={data} value={String(form.youtubeApiKey ?? '')} onChange={change} />
+        <p className="note">Monologerne kommer fra YouTube. Uden nøgle bruges kanalernes RSS, som falder ud i perioder. Med en gratis nøgle fra samme Google Cloud-projekt som kalenderen (YouTube Data API v3) er det stabilt.</p>
       </fieldset>
 
       <fieldset>

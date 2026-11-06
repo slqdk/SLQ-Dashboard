@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Request
 
-from . import store
+from . import store, strava
 
 router = APIRouter(prefix="/api/s/logmylife", tags=["logmylife"])
 
@@ -49,3 +49,15 @@ def remove(event_id: int, request: Request):
     except LookupError as exc:
         raise HTTPException(404, str(exc))
     return {"ok": True}
+
+
+@router.post("/import/strava")
+async def import_strava(request: Request):
+    """activities.csv from Strava's own export, sent as the request body."""
+    body = await request.body()
+    if len(body) > strava.MAX_BYTES:
+        raise HTTPException(413, "Filen er for stor. Brug activities.csv, ikke hele zip-filen.")
+    try:
+        return strava.import_csv(request.state.user["id"], body)
+    except strava.Problem as exc:
+        raise HTTPException(400, str(exc))

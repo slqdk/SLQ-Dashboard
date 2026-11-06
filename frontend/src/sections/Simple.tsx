@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { api } from '../core/api'
-import { ago, clock, cap, dayName, shortDay } from '../core/format'
+import { ago, clock, cap, dayName, monthName, shortDay, whole } from '../core/format'
 import { hrefOf, readRoute } from '../core/routes'
 import { useNow, usePoll } from '../core/usePoll'
-import type { F1Session, LifeEvent, NewsFeedState, NewsItem, User } from '../core/types'
+import type { F1Session, FamilyLogState, LifeEvent, NewsFeedState, NewsItem, User } from '../core/types'
 import { SectionHead } from './common'
 
 // ---- Kalender ---------------------------------------------------------------
@@ -215,14 +215,89 @@ export function Aktier({ user }: { user: User }) {
   )
 }
 
+interface FamilySearch {
+  q: string
+  transactions: { total: number; sum: number; rows: { date: string; merchant: string; text: string; amount: number; categoryName: string }[] } | null
+  places: { id: number; name: string; address: string }[]
+}
+
 export function FamilyLog({ user, onAuthLost }: { user: User; onAuthLost: () => void }) {
-  const { data } = usePoll<{ address: boolean; connected: boolean }>('/api/s/familylog/state', 0, onAuthLost)
+  const { data, reload } = usePoll<FamilyLogState>('/api/s/familylog/state', 0, onAuthLost)
+  const [q, setQ] = useState('')
+  const [found, setFound] = useState<FamilySearch | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [problem, setProblem] = useState('')
+
+  const search = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setBusy(true)
+    try {
+      setFound(await api<FamilySearch>(`/api/s/familylog/search?q=${encodeURIComponent(q)}`))
+      setProblem('')
+    } catch (exc) {
+      setProblem(exc instanceof Error ? exc.message : 'Søgningen lykkedes ikke.')
+    }
+    setBusy(false)
+  }
+  const sync = async () => {
+    setBusy(true)
+    try {
+      await api('/api/s/familylog/sync', { method: 'POST' })
+      await reload()
+    } catch (exc) {
+      setProblem(exc instanceof Error ? exc.message : 'Det lykkedes ikke.')
+    }
+    setBusy(false)
+  }
+
+  const month = data?.month
   return (
     <main className="page narrow">
-      <SectionHead title="FamilyLog" text="Dine egne data fra FamilyLog. Dashboardet kan søge og læse, aldrig skrive." />
+      <SectionHead title="FamilyLog" text="Dine egne data fra FamilyLog. Dashboardet kan søge og læse, aldrig skrive.">
+        {data?.connected && <button disabled={busy} onClick={() => void sync()}>Hent nu</button>}
+      </SectionHead>
       {data && !data.address && <p className="empty">Adressen til FamilyLog mangler.{user.role === 'admin' ? ' Den sættes under Admin → Opsætning.' : ''}</p>}
-      {data?.address && !data.connected && <p className="empty">Din læsenøgle mangler.{user.role === 'admin' ? ' Den sættes under Admin → Brugere.' : ' Bed administratoren om at sætte den.'}</p>}
-      {data?.connected && <p className="lead">Forbundet. Søgning kommer, når FamilyLogs læse-API er klar.</p>}
+      {data?.address && !data.connected && <p className="empty">Din læsenøgle mangler.{user.role === 'admin' ? ' Lav den i FamilyLog under Settings → Accounts, og sæt den under Admin → Brugere.' : ' Bed administratoren om at sætte den.'}</p>}
+      {data?.error && <p className="problem">{data.error}</p>}
+      {problem && <p className="problem">{problem}</p>}
+      {month && (
+        <section className="fl-month">
+          <p className="fl-spent">{whole(month.spent)} kr</p>
+          <p className="meta">brugt i {monthName(new Date())}, {whole(month.count)} posteringer</p>
+          <ul>
+            {month.top.map((c) => <li key={c.name}><span>{c.name}</span><span className="meta">{whole(c.spent)} kr</span></li>)}
+          </ul>
+        </section>
+      )}
+      {data?.connected && (
+        <form className="filters" onSubmit={search}>
+          <input type="search" placeholder="Søg i Økonomi og FamilyMap" aria-label="Søg i FamilyLog" value={q} onChange={(e) => setQ(e.target.value)} />
+          <button disabled={busy || !q.trim()} type="submit">Søg</button>
+        </form>
+      )}
+      {found && (
+        <>
+          {found.transactions && (
+            <section>
+              <h2>Økonomi</h2>
+              <p className="meta">{whole(found.transactions.total)} posteringer, {whole(found.transactions.sum)} kr i alt</p>
+              <ul className="fl-rows">
+                {found.transactions.rows.map((r, i) => (
+                  <li key={i}><span className="meta">{r.date}</span><span>{r.merchant || r.text}</span><span>{whole(r.amount)} kr</span></li>
+                ))}
+              </ul>
+            </section>
+          )}
+          <section>
+            <h2>FamilyMap</h2>
+            {found.places.length ? (
+              <ul className="fl-places">
+                {found.places.map((p) => <li key={p.id}>{p.name}{p.address ? <span className="meta"> {p.address}</span> : null}</li>)}
+              </ul>
+            ) : <p className="empty">Ingen steder matcher.</p>}
+          </section>
+        </>
+      )}
     </main>
   )
 }

@@ -123,6 +123,16 @@ await page.waitForSelector('.life-title:has-text("Første dag som kursusleder")'
 check(true, 'own entry saved')
 check(await page.locator('.life-title:has-text("fortidsminde")').count() === 1, 'a past calendar event is in the log')
 check(await page.locator('.on-this-day:has-text("Første dag som kursusleder")').count() === 1, 'on this day finds it')
+await page.click('button:has-text("Importér fra Strava")')
+await page.setInputFiles('dialog input[type="file"]', {
+  name: 'activities.csv',
+  mimeType: 'text/csv',
+  buffer: Buffer.from('Activity ID,Activity Date,Activity Name,Activity Type,Activity Description,Elapsed Time,Distance\n1,"Mar 4, 2021, 5:47:48 PM",Morgenløb,Run,,3120,10.21\n'),
+})
+await page.waitForSelector('dialog .lead:has-text("1 nye")')
+await page.click('dialog button:has-text("Luk")')
+await page.waitForSelector('.life-title:has-text("Morgenløb")')
+check(true, 'Strava export imported')
 await shot('logmylife')
 
 // ---- the other sections -----------------------------------------------------------
@@ -132,6 +142,8 @@ check(await page.locator('.fact').count() > 50, 'SLQ DL lists the facts')
 await page.selectOption('select[aria-label="Historie"]', 'arvefoelgen')
 await page.waitForFunction(() => document.querySelectorAll('.fact').length < 25)
 check(true, 'SLQ DL filters by story')
+await page.waitForSelector('.dl-monologues a:has-text("A Closer Look")')
+check(await page.locator('.dl-monologues a').count() === 3, 'monologues listed, guests and music left out')
 await shot('slq-dl')
 
 await go('formel-1')

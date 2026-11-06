@@ -7,7 +7,7 @@ import { Dialog, SectionHead } from './common'
 
 const API = '/api/s/logmylife'
 const SOURCE_TEXT: Record<string, string> = {
-  manual: 'Eget indlæg', google: 'Google Kalender',
+  manual: 'Eget indlæg', google: 'Google Kalender', strava: 'Strava',
   'familylog.dagbog': 'Dagbog', 'familylog.familymap': 'FamilyMap',
 }
 
@@ -44,6 +44,7 @@ export function LogMyLife({ onAuthLost }: { onAuthLost: () => void }) {
   const [q, setQ] = useState('')
   const [source, setSource] = useState('')
   const [editing, setEditing] = useState<Partial<LifeEvent> | null>(null)
+  const [importing, setImporting] = useState(false)
   const params = useMemo(() => new URLSearchParams(Object.entries({ scope, q, source, limit: '300' }).filter(([, v]) => v)), [scope, q, source])
   const list = usePoll<{ events: LifeEvent[]; more: boolean }>(`${API}/events?${params}`, 0, onAuthLost)
   const meta = usePoll<Meta>(`${API}/meta`, 0, onAuthLost)
@@ -69,6 +70,7 @@ export function LogMyLife({ onAuthLost }: { onAuthLost: () => void }) {
   return (
     <main className="page">
       <SectionHead title="LogMyLife" text={summary}>
+        <button onClick={() => setImporting(true)}>Importér fra Strava</button>
         <button className="primary" onClick={() => setEditing({})}>Nyt indlæg</button>
       </SectionHead>
 
@@ -108,7 +110,51 @@ export function LogMyLife({ onAuthLost }: { onAuthLost: () => void }) {
       {editing && (
         <EventForm event={editing} categories={meta.data?.categories ?? []} onClose={() => setEditing(null)} onSaved={saved} />
       )}
+      {importing && <StravaImport onClose={() => setImporting(false)} onDone={() => { void list.reload(); void meta.reload() }} />}
     </main>
+  )
+}
+
+function StravaImport({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
+  const [problem, setProblem] = useState('')
+  const [result, setResult] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const send = async (file: File | undefined) => {
+    if (!file) return
+    setBusy(true)
+    setProblem('')
+    try {
+      const res = await fetch(`${API}/import/strava`, {
+        method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'text/csv' }, body: file,
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(typeof data.detail === 'string' ? data.detail : 'Importen lykkedes ikke.')
+      setResult(`${data.added} nye, ${data.updated} opdaterede, ${data.same} havde du allerede.${data.skipped ? ` ${data.skipped} rækker kunne ikke læses.` : ''}`)
+      onDone()
+    } catch (exc) {
+      setProblem(exc instanceof Error ? exc.message : 'Importen lykkedes ikke.')
+    }
+    setBusy(false)
+  }
+
+  return (
+    <Dialog title="Importér fra Strava" onClose={onClose}>
+      <ol className="steps">
+        <li>Sæt sproget på Strava til English.</li>
+        <li>Gå til Settings → My Account → Download your account, og bestil dine data.</li>
+        <li>Pak zip-filen fra mailen ud, og vælg activities.csv her.</li>
+      </ol>
+      <label>activities.csv
+        <input type="file" accept=".csv,text/csv" disabled={busy} onChange={(e) => void send(e.target.files?.[0])} />
+      </label>
+      {busy && <p className="note">Importerer.</p>}
+      {result && <p className="lead">{result}</p>}
+      {problem && <p className="problem">{problem}</p>}
+      <div className="dialog-actions">
+        <button onClick={onClose}>Luk</button>
+      </div>
+    </Dialog>
   )
 }
 

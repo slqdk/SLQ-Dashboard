@@ -33,6 +33,10 @@ der er tæt på), adressen til dk-live, Google og nyhedskilder.
 Ny proxy host `dashboard.slq.dk` → `http://<ip>:8090` med Let's Encrypt og Force
 SSL. Sæt derefter **Offentlig adresse** i Admin til `https://dashboard.slq.dk`.
 
+Under Advanced, så en Strava-eksport kan importeres:
+
+    client_max_body_size 30m;
+
 Dashboardet har login, men indeholder kalender, tidslinje og økonomi. Skal det
 kun bruges hjemme og over WireGuard, så læg en Access List på i NPM.
 
@@ -43,7 +47,13 @@ Google skal have. Husk at sætte OAuth consent screen til *In production*: i
 *Testing* udløber forbindelsen efter 7 dage. Hver person forbinder bagefter sin
 egen konto under **Kalender**.
 
-## 5. Opdatering og backup
+## 5. FamilyLog
+
+Kræver FamilyLog 0.5.0. Sæt adressen under **Admin → Opsætning → FamilyLog**. Lav
+en læsenøgle pr. person i FamilyLog under **Settings → Accounts → Read key**, og
+sæt den ind under **Admin → Brugere → Ret**. Nøglen vises kun én gang.
+
+## 6. Opdatering og backup
 
 ```bash
 cd /opt/slq-dashboard

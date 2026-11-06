@@ -138,11 +138,35 @@ export interface Fact {
   yearsAgo: number | null
 }
 
+export interface Monologue {
+  show: string
+  title: string
+  url: string
+  at: string | null
+}
+
 export interface LateNightBlock {
   date: string
   exact: Fact[]
   near: Fact[]
   total: number
+  monologues: Monologue[]
+}
+
+export interface FamilyLogState {
+  address: boolean
+  connected: boolean
+  checkedAt?: string
+  error?: string
+  added?: number
+  month?: {
+    from: string
+    to: string
+    spent: number
+    income: number
+    count: number
+    top: { name: string; spent: number }[]
+  } | null
 }
 
 export interface LinkItem {
@@ -168,7 +192,7 @@ export interface Overview {
     news?: { items: NewsItem[]; feeds: NewsFeedState[] }
     logmylife?: { onThisDay: LifeEvent[]; latest: LifeEvent[]; total: number }
     aktier?: { mode: string; positions: unknown[] }
-    familylog?: { address: boolean; connected: boolean }
+    familylog?: FamilyLogState
     f1?: F1Block
     latenight?: LateNightBlock
     links?: { pinned: LinkItem[]; total: number }

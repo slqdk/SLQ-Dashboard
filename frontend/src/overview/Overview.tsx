@@ -1,10 +1,10 @@
-import { ago, clock, dayName, kr, longDate, one, until, whole } from '../core/format'
+import { ago, clock, dayName, kr, longDate, monthName, one, until, whole } from '../core/format'
 import { hrefOf } from '../core/routes'
 import { useNow, usePoll } from '../core/usePoll'
 import type { DkLive, LifeEvent, LiveUpdate, Overview as Data, User } from '../core/types'
 import { DayBand } from './DayBand'
 import { Updates } from '../sections/DkLive'
-import { factWhen } from '../sections/LateNight'
+import { factWhen, MonologueList } from '../sections/LateNight'
 
 const LIVE_SECONDS = 30
 
@@ -170,6 +170,12 @@ export function Overview({ user, onAuthLost }: { user: User; onAuthLost: () => v
                 {f.body && <p className="dl-body">{f.body}</p>}
               </article>
             ))}
+            {!!b.latenight.monologues?.length && (
+              <div className="monologues">
+                <h3>Nyeste monologer</h3>
+                <MonologueList items={b.latenight.monologues} now={now} />
+              </div>
+            )}
           </Block>
         )}
 
@@ -234,7 +240,14 @@ export function Overview({ user, onAuthLost }: { user: User; onAuthLost: () => v
 
         {b.familylog && (
           <Block id="familylog" title="FamilyLog" className="w2">
-            <p className="empty">{b.familylog.connected ? 'Forbundet, kun læsning.' : 'Mangler læsenøgle.'}</p>
+            {b.familylog.month ? (
+              <>
+                <p className="fl-spent">{whole(b.familylog.month.spent)} kr</p>
+                <p className="note">brugt i {monthName(now)}</p>
+              </>
+            ) : (
+              <p className="empty">{b.familylog.connected ? 'Forbundet, kun læsning.' : 'Mangler læsenøgle.'}</p>
+            )}
           </Block>
         )}
       </div>

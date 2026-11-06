@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
-import { fullDate, localDate } from '../core/format'
-import { usePoll } from '../core/usePoll'
-import type { Fact, User } from '../core/types'
+import { ago, fullDate, localDate } from '../core/format'
+import { useNow, usePoll } from '../core/usePoll'
+import type { Fact, Monologue, User } from '../core/types'
 import { api } from '../core/api'
 import { Dialog, SectionHead } from './common'
 
@@ -27,6 +27,19 @@ export function factWhen(f: Fact, today: string): string {
   const years = f.yearsAgo ?? Number(today.slice(0, 4)) - Number(f.date.slice(0, 4))
   if (f.date.slice(5) === today.slice(5)) return `I dag for ${years} år siden`
   return `${fullDate(localDate(f.date))}, for ${years} år siden`
+}
+
+export function MonologueList({ items, now }: { items: Monologue[]; now: Date }) {
+  return (
+    <ul className="monologue-list">
+      {items.map((m) => (
+        <li key={m.url}>
+          <a href={m.url} target="_blank" rel="noreferrer noopener">{m.title}</a>
+          <span className="meta">{m.show}{m.at ? `, ${ago(m.at, now.getTime())}` : ''}</span>
+        </li>
+      ))}
+    </ul>
+  )
 }
 
 function FactRow({ f, onEdit }: { f: Fact; onEdit?: (f: Fact) => void }) {
@@ -112,6 +125,8 @@ export function LateNight({ user, onAuthLost }: { user: User; onAuthLost: () => 
     Object.entries({ q, host, story, decade }).filter(([, v]) => v)), [q, host, story, decade])
   const today = usePoll<Today>('/api/s/latenight/today', 0, onAuthLost)
   const list = usePoll<Facts>(`/api/s/latenight/facts?${query}`, 0, onAuthLost)
+  const monologues = usePoll<{ items: Monologue[]; status: { ok: boolean; text: string } }>('/api/s/latenight/monologues', 1800, onAuthLost)
+  const now = useNow(60_000)
   const facts = list.data
   const admin = user.role === 'admin'
   const lead = today.data?.exact.length ? today.data.exact : today.data?.near ?? []
@@ -130,6 +145,14 @@ export function LateNight({ user, onAuthLost }: { user: User; onAuthLost: () => 
             {f.body && <p className="dl-body">{f.body}</p>}
           </article>
         ))}
+      </section>
+
+      <section className="dl-monologues">
+        <h2>Nyeste monologer</h2>
+        {monologues.data?.items.length ? <MonologueList items={monologues.data.items} now={now} /> : (
+          <p className="empty">{monologues.data?.status.text ?? 'Henter.'}</p>
+        )}
+        {!!monologues.data?.items.length && !monologues.data.status.ok && <p className="note">{monologues.data.status.text}</p>}
       </section>
 
       <div className="filters">

@@ -12,6 +12,7 @@ Then start the backend with (see tools/dev.sh):
     APP_GOOGLE_AUTH_URL=http://127.0.0.1:9100/google/auth
     APP_GOOGLE_TOKEN_URL=http://127.0.0.1:9100/google/token
     APP_GOOGLE_API_BASE=http://127.0.0.1:9100/google/api
+    APP_YOUTUBE_FEED_URL=http://127.0.0.1:9100/youtube
 """
 from __future__ import annotations
 
@@ -145,6 +146,24 @@ def rss(name: str) -> str:
     return "".join(out)
 
 
+# ---- YouTube ---------------------------------------------------------------------
+
+def youtube(channel: str) -> str:
+    rows = {
+        "UCa6vGFO9ty8v5KZJXQxdhaw": ["Eksempel: Jimmy Kimmel on the news of the day", "Gæst Navn on His New Movie", "Band Navn – Song"],
+        "UC8-Th83bH_thdKZDJCrn88g": ["Eksempel: Tonight-monolog | The Tonight Show", "Game with Gæst | The Tonight Show Starring Jimmy Fallon"],
+        "UCVTyTA7-g9nopHeHbeuvpRA": ["Eksempel: politik i dag: A Closer Look", "Gæst Navn Talks Her Film"],
+    }.get(channel, [])
+    out = ['<?xml version="1.0" encoding="UTF-8"?><feed xmlns:yt="http://www.youtube.com/xml/schemas/2015" '
+           'xmlns="http://www.w3.org/2005/Atom"><title>Mock</title>']
+    for i, title in enumerate(rows):
+        when = (now() - timedelta(hours=3 + i * 5)).isoformat()
+        out.append(f"<entry><id>yt:video:{channel[-4:]}{i}</id><yt:videoId>{channel[-4:]}{i}</yt:videoId>"
+                   f"<title>{title.replace('&', '&amp;')}</title><published>{when}</published></entry>")
+    out.append("</feed>")
+    return "".join(out)
+
+
 # ---- Google ----------------------------------------------------------------------
 
 def google_events(query: dict) -> dict:
@@ -201,6 +220,13 @@ class Handler(BaseHTTPRequestHandler):
             body = rss(path.rsplit("/", 1)[1]).encode()
             self.send_response(200)
             self.send_header("Content-Type", "application/rss+xml")
+            self.end_headers()
+            self.wfile.write(body)
+            return None
+        if path == "/youtube":
+            body = youtube(query["channel_id"][0]).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/atom+xml")
             self.end_headers()
             self.wfile.write(body)
             return None

@@ -14,6 +14,7 @@ export const clock = (d: Date | string) => timeShort.format(new Date(d)).replace
 export const shortDay = (d: Date | string) => dayShort.format(new Date(d)).replace(/\.$/, '')
 export const weekday = (d: Date | string) => weekdayLong.format(new Date(d))
 export const fullDate = (d: Date | string) => dateFull.format(new Date(d))
+export const monthName = (d: Date) => new Intl.DateTimeFormat(da, { month: 'long' }).format(d)
 
 export const dayKey = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`

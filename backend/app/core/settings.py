@@ -43,6 +43,8 @@ DEFAULTS: dict = {
     "familylogUrl": "",         # http://30.11.0.108:8081
     # ---- Nyheder ----
     "newsFeeds": DEFAULT_FEEDS,
+    # ---- SLQ DL ----
+    "youtubeApiKey": "",        # optional; never sent back to the browser
     # ---- Aktier ----
     "nordnetMode": "off",       # off | api | csv
     "nordnetApiKey": "",        # never sent back to the browser
@@ -58,7 +60,7 @@ ENV_OVERRIDES = {
     "familylogUrl": "APP_FAMILYLOG_URL",
 }
 
-SECRET_KEYS = {"googleClientSecret", "nordnetApiKey"}
+SECRET_KEYS = {"googleClientSecret", "nordnetApiKey", "youtubeApiKey"}
 URL_KEYS = {"publicUrl", "dkliveUrl", "dkliveLink", "familylogUrl"}
 TEXT_KEYS = {"googleClientId", "homeName"}
 NORDNET_MODES = ("off", "api", "csv")
