@@ -649,7 +649,7 @@ STRAVA = (
 def test_strava_export_lands_on_the_timeline(client):
     r = client.post("/api/s/logmylife/import/strava", content=STRAVA)
     assert r.status_code == 200
-    assert r.json() == {"added": 2, "updated": 0, "same": 0, "skipped": 1}
+    assert r.json() == {"added": 2, "updated": 0, "same": 0, "skipped": 1, "files": 0}
     events = client.get("/api/s/logmylife/events?source=strava").json()["events"]
     assert [e["title"] for e in events] == ["Tur til Kolding", "Morgenløb"]
     run = events[1]

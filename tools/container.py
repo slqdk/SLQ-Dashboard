@@ -21,8 +21,8 @@ as possible:
   3. Tags the running image `slq-dashboard:rollback`, pulls (fast-forward
      only) and BUILDS the new image while the old one keeps serving. A
      failed build puts the code back - the app was never touched.
-  4. Stops the app and backs up the whole /data volume to
-     <backups>/<time>_<version>.tar.gz (+ .json: commit, version, image).
+  4. Stops the app and backs up the /data volume, without LogMyLife's pictures,
+     to <backups>/<time>_<version>.tar.gz (+ .json: commit, version, image).
      The app is stopped so SQLite is not copied mid-write.
   5. Starts the new image and waits until it answers
      /api/auth/status from inside the container.
@@ -284,7 +284,8 @@ def tar_in_container(script: str, where: Path) -> subprocess.CompletedProcess:
 def make_backup(name: str, info: dict) -> Path:
     where = backup_dir()
     where.mkdir(parents=True, exist_ok=True)
-    r = tar_in_container(f"tar --numeric-owner -czf /backup/{name}.tar.gz -C /data .", where)
+    # Not the pictures: every update would pack gigabytes of what never changes.
+    r = tar_in_container(f"tar --numeric-owner --exclude=./logmylife -czf /backup/{name}.tar.gz -C /data .", where)
     tar = where / f"{name}.tar.gz"
     if r.returncode != 0 or not tar.is_file():
         raise Stop("the backup of /data failed:\n         "
@@ -298,7 +299,7 @@ def restore_data(name: str) -> None:
     if not (where / f"{name}.tar.gz").is_file():
         raise Stop(f"no backup {name}.tar.gz in {where}")
     r = tar_in_container(
-        f"find /data -mindepth 1 -maxdepth 1 -exec rm -rf {{}} + && "
+        f"find /data -mindepth 1 -maxdepth 1 ! -name logmylife -exec rm -rf {{}} + && "
         f"tar --numeric-owner -xzf /backup/{name}.tar.gz -C /data", where)
     if r.returncode != 0:
         raise Stop("restoring /data failed:\n         " + (r.stderr or r.stdout or "").strip()[-600:])

@@ -24,6 +24,17 @@ export interface LifeEvent {
   owner: string | null
 }
 
+export interface LifeFile {
+  id: number
+  name: string
+  kind: 'image' | 'video' | 'file'
+  mime: string
+  bytes: number
+  width: number | null
+  height: number | null
+  taken: string | null
+}
+
 export interface CalendarEvent {
   id: string
   title: string

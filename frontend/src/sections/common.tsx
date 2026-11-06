@@ -51,10 +51,10 @@ export function FileImport({ title, url, label, accept, onClose, onDone, childre
     setProblem('')
     setResult('')
     try {
-      const res = await fetch(url, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'text/csv' }, body: file })
-      const data = await res.json()
-      if (!res.ok) throw new Error(typeof data.detail === 'string' ? data.detail : 'Importen lykkedes ikke.')
-      setResult(`${data.added} nye, ${data.updated} opdaterede, ${data.same} havde du allerede.${data.skipped ? ` ${data.skipped} rækker kunne ikke læses.` : ''}`)
+      const res = await fetch(url, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/octet-stream' }, body: file })
+      const data = await res.json().catch(() => ({}))         // a proxy in front answers in HTML
+      if (!res.ok) throw new Error(typeof data.detail === 'string' ? data.detail : res.status === 413 ? 'Filen er for stor.' : 'Importen lykkedes ikke.')
+      setResult(`${data.added} nye, ${data.updated} opdaterede, ${data.same} havde du allerede.${data.files ? ` ${data.files} billeder og ruter kom med.` : ''}${data.skipped ? ` ${data.skipped} rækker kunne ikke læses.` : ''}`)
       onDone()
     } catch (exc) {
       setProblem(exc instanceof Error ? exc.message : 'Importen lykkedes ikke.')

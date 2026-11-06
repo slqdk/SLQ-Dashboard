@@ -53,9 +53,11 @@ der er tæt på), kortets lag og nøgler, Google og nyhedskilder.
 Ny proxy host `dashboard.slq.dk` → `http://<ip>:8090` med Let's Encrypt og Force
 SSL. Sæt derefter **Offentlig adresse** i Admin til `https://dashboard.slq.dk`.
 
-Under Advanced, så en Strava-eksport kan importeres:
+Under Advanced, så billeder, film og en Strava-eksport kan komme igennem:
 
-    client_max_body_size 30m;
+    client_max_body_size 1100m;
+    proxy_request_buffering off;
+    proxy_read_timeout 600s;
 
 Dashboardet har login, men indeholder kalender, tidslinje og økonomi. Skal det
 kun bruges hjemme og over WireGuard, så læg en Access List på i NPM.
@@ -121,6 +123,12 @@ bash update.sh rollback   # tilbage til seneste backup, kode og data
 bash update.sh compose logs -f
 ```
 
-Alt der er dit, ligger i volumet `/data`: `app.db`, `settings.json`, `secret.key`
-og logs. Egne indstillinger hører til i
+Alt der er dit, ligger i volumet `/data`: `app.db`, `settings.json`, `secret.key`,
+`logmylife/` med billeder og filer, og logs. Egne indstillinger hører til i
 `deploy/container/docker-compose.override.yml`, som git ignorerer.
+
+`update.sh` tager backup af alt andet end `logmylife/`, og en rollback rører den
+heller ikke, for billeder og film kan fylde mere, end der er plads til to gange. Tag
+derfor Proxmox-backups af containeren, eller hent en zip under LogMyLife → Eksportér.
+Eksportdialogen viser, hvor meget der er ledigt. Mangler der plads, så gør disken
+større på noden med `pct resize <id> rootfs +100G`.

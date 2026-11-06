@@ -10,7 +10,7 @@ sin egen LXC på Proxmox. Lavet til pc'en; på telefonen virker det bare.
 | **Kalender** | Din Google-kalender, kun læsning | Google Calendar API, én konto pr. person |
 | **DK live** | Elpriser, trafik og opdateringer. Kortets 18 lag slås til og fra i Admin | Direkte fra kilderne: adsb.lol, AISStream, 112-puls, Vejdirektoratet, Rejseplanen, Autobahn, DMI, Energi Data Service, Politi Update og flere. Fire af dem kræver en gratis nøgle |
 | **Nyheder** | Overskrifter og korte tekster uden reklamer | RSS, hentet af serveren (DR og TV 2 som standard) |
-| **LogMyLife** | Din egen tidslinje, der husker alt | Dine indlæg, Google, Dagbog, FamilyMap, Strava-eksport |
+| **LogMyLife** | Din egen vandrette tidslinje, der husker alt, med billeder og filer, og som kan eksporteres | Dine indlæg, Google, Dagbog, FamilyMap, Strava-eksport |
 | **Aktier** | Din beholdning, ugens udvikling, snitkurs, udbytte og resultat pr. år | CSV-udtræk fra Nordnet, som du selv importerer, og kurser fra Yahoo Finance |
 | **FamilyLog** | Månedens forbrug og søgning, kun læsning | FamilyLog 0.5.0 med læsenøgle pr. person |
 | **Formel 1** | Sæsonens sessioner, ikke noget live | Jolpica |

@@ -7,6 +7,7 @@ before `app` is imported, and the background jobs stay off.
 from __future__ import annotations
 
 import os
+import shutil
 import sys
 from pathlib import Path
 
@@ -37,6 +38,7 @@ def fresh_db(_isolate_data):
     data = Path(os.environ["APP_DATA_DIR"])
     for name in ("app.db", "app.db-wal", "app.db-shm", "settings.json", "secret.key", "f1-schedule.json"):
         (data / name).unlink(missing_ok=True)
+    shutil.rmtree(data / "logmylife", ignore_errors=True)
     auth._failures.clear()
     for s in SECTIONS:
         if s.reset:

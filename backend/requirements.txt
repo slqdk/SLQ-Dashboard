@@ -7,3 +7,6 @@ cryptography>=42
 paho-mqtt>=2.0
 # Skibe: AISStream is a websocket.
 websockets>=13
+# LogMyLife: pictures on entries, resized and without EXIF. HEIF is what phones save.
+Pillow>=10
+pillow-heif>=0.16

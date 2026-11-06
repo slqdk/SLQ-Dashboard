@@ -6,6 +6,7 @@ import uuid
 from datetime import date, datetime, timedelta, timezone
 
 from ...core import db, settings
+from . import files
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS life_events (
@@ -119,6 +120,12 @@ def ingest(user_id: int, source: str, source_id: str, *, title: str, start: str,
         return "updated"
 
 
+def event_id(user_id: int, source: str, source_id: str) -> int:
+    with db.connect() as con:
+        return con.execute("SELECT id FROM life_events WHERE user_id=? AND source=? AND source_id=?",
+                           (user_id, source, source_id)).fetchone()["id"]
+
+
 def mark_deleted(user_id: int, source: str, source_id: str) -> bool:
     """The source no longer has it. The row stays: the log remembers."""
     with db.connect() as con:
@@ -132,9 +139,11 @@ def mark_deleted(user_id: int, source: str, source_id: str) -> bool:
 def forget(user_id: int, source: str, prefix: str) -> int:
     """Take the rows whose source id starts with `prefix` out of the log. The one
     exception to the log remembering: the person moved it to another calendar."""
+    where = "user_id=? AND source=? AND substr(source_id, 1, ?)=?"
+    args = (user_id, source, len(prefix), prefix)
     with db.connect() as con:
-        return con.execute("DELETE FROM life_events WHERE user_id=? AND source=? AND substr(source_id, 1, ?)=?",
-                           (user_id, source, len(prefix), prefix)).rowcount
+        files.drop_with_events(con, f"SELECT id FROM life_events WHERE {where}", args)
+        return con.execute(f"DELETE FROM life_events WHERE {where}", args).rowcount
 
 
 # ---- entries by hand ------------------------------------------------------------
@@ -217,6 +226,7 @@ def remove(user_id: int, event_id: int) -> None:
         row = _own(con, user_id, event_id)
         if row["source"] != MANUAL:
             raise Problem("Kun egne indlæg kan slettes. Dette kom fra en anden kilde.")
+        files.drop_with_events(con, "SELECT ?", (event_id,))
         con.execute("DELETE FROM life_events WHERE id=?", (event_id,))
 
 
@@ -256,6 +266,52 @@ def timeline(user_id: int, *, scope: str = "mine", before: str | None = None, q:
         rows = con.execute(sql, args).fetchall()
     more = len(rows) > limit
     return {"events": [_dto(r, user_id) for r in rows[:limit]], "more": more}
+
+
+INDEX_FIELDS = ("id", "day", "end", "title", "source", "category", "picture", "files", "gone", "owner")
+
+
+def index(user_id: int, *, scope: str = "mine", q: str = "", source: str = "") -> dict:
+    """Every entry up to today, oldest first, with what a place on the timeline needs and
+    no more: one list per row, so thousands of them stay small."""
+    sql = ("SELECT e.id, e.day, e.end_at, e.all_day, e.title, e.source, e.category, e.deleted_at_source, e.user_id,"
+           " COALESCE(NULLIF(u.name, ''), u.username) AS owner,"
+           " (SELECT MIN(f.id) FROM life_files f WHERE f.event_id = e.id AND f.kind = 'image') AS picture,"
+           " (SELECT COUNT(*) FROM life_files f WHERE f.event_id = e.id) AS files"
+           " FROM life_events e JOIN users u ON u.id = e.user_id WHERE ")
+    sql += "e.shared = 1 AND e.user_id != ?" if scope == "family" else "e.user_id = ?"
+    args: list = [user_id]
+    sql += " AND e.day <= ?"
+    args.append(today())
+    if q.strip():
+        like = f"%{q.strip()}%"
+        sql += " AND (e.title LIKE ? OR e.description LIKE ? OR e.location LIKE ?)"
+        args += [like, like, like]
+    if source:
+        sql += " AND e.source = ?"
+        args.append(source)
+    sql += " ORDER BY e.day, e.id"
+    with db.connect() as con:
+        rows = con.execute(sql, args).fetchall()
+
+    def last_day(r) -> str | None:
+        end = (r["end_at"] or "")[:10]
+        return end if r["all_day"] and end > r["day"] else None
+
+    return {"fields": INDEX_FIELDS, "today": today(),
+            "rows": [[r["id"], r["day"], last_day(r), r["title"], r["source"], r["category"], r["picture"], r["files"],
+                      1 if r["deleted_at_source"] else 0, None if r["user_id"] == user_id else r["owner"]] for r in rows]}
+
+
+def entry(user_id: int, event_id: int) -> dict:
+    """One entry in full, with its files: the person's own, or one shared with them."""
+    with db.connect() as con:
+        row = con.execute("SELECT e.*, COALESCE(NULLIF(u.name, ''), u.username) AS owner"
+                          " FROM life_events e JOIN users u ON u.id = e.user_id"
+                          " WHERE e.id = ? AND (e.user_id = ? OR e.shared = 1)", (event_id, user_id)).fetchone()
+        if row is None:
+            raise LookupError("Findes ikke.")
+        return {**_dto(row, user_id), "files": files.of_event(con, event_id)}
 
 
 def on_this_day(user_id: int, day: str | None = None, limit: int = 6) -> list[dict]:

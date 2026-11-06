@@ -14,7 +14,8 @@ Proxmox LXC. **Read `docs/PLAN.md` first: decisions, what is built, what is open
   one module per live source, each a job that keeps its newest result in memory.
 - `frontend/src/` — React + TypeScript + Vite. `overview/` is the front page,
   `map/` the MapLibre map behind it with one file per layer, `sections/` one component
-  per section, `admin/` users and setup.
+  per section (`sections/life/` is LogMyLife's timeline, with its placement in `layout.ts`),
+  `admin/` users and setup.
 - `tools/mock_upstreams.py` — stand-ins for every live source (`APP_LIVE_MOCK`), Jolpica,
   RSS, Google and go2rtc.
   `tools/mock_printer.py` — a stand-in Bambu printer, real TLS and MQTT.
@@ -39,6 +40,11 @@ Proxmox LXC. **Read `docs/PLAN.md` first: decisions, what is built, what is open
   which is safe to repeat. One calendar per person feeds it; the rest stay in
   `google_events` for the page. Moving the log to another calendar is the one thing
   that removes rows, and the page asks first.
+- **Pictures keep their originals.** A file on an entry lives in `data/logmylife/<user>/`
+  untouched; what is shown is a re-encoded copy without EXIF, and the family gets only that
+  copy. Those folders are too big for `update.sh`'s backup, so it skips them and the
+  export is the way out. From Strava's zip only `activities.csv` and the files its rows
+  name are read; the rest is followers and logins.
 - **`overview()` never calls an upstream.** It reads the database or a job's cache,
   so the page always answers at once.
 - **No secrets to the browser or the log.** Settings secrets go through

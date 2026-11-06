@@ -319,8 +319,8 @@ def google_events(query: dict) -> dict:
         return (base + timedelta(days=day, hours=h, minutes=m)).isoformat()
 
     items = [
-        {"id": "e1", "summary": "Eksempel: kursusdag", "start": {"dateTime": at(0, 9)}, "end": {"dateTime": at(0, 15, 30)}},
-        {"id": "e2", "summary": "Eksempel: træning", "start": {"dateTime": at(0, 18)}, "end": {"dateTime": at(0, 19, 30)}, "location": "Hallen", "colorId": "11"},
+        {"id": "e1", "summary": "Eksempel: kursusdag", "start": {"dateTime": at(0, 9)}, "end": {"dateTime": at(0, 23, 50)}},
+        {"id": "e2", "summary": "Eksempel: træning", "start": {"dateTime": at(0, 18)}, "end": {"dateTime": at(0, 23, 55)}, "location": "Hallen", "colorId": "11"},
         {"id": "e3", "summary": "Eksempel: hele dagen", "start": {"date": (base + timedelta(days=1)).strftime("%Y-%m-%d")},
          "end": {"date": (base + timedelta(days=2)).strftime("%Y-%m-%d")}},
         {"id": "e4", "summary": "Eksempel: tandlæge", "start": {"dateTime": at(1, 10)}, "end": {"dateTime": at(1, 11)}},

@@ -70,6 +70,26 @@ section registry, `update.sh`), same as SLQ Hub and FamilyLog.
   checked once, when the stream starts. A video removed from the page goes on
   downloading unless told to stop, so the page tells it to.
 
+## LogMyLife as a timeline (0.7.0)
+The log is a horizontal line now: past to the left, today at the right, from the whole log
+down to a week. `GET /timeline` sends every entry as a short list, so thousands of them stay
+small, and `sections/life/layout.ts` works out where they go: lanes above and below the
+axis, pictures first, then own entries, then the rest, and what has no room is counted in
+the bars on the axis. Only what is in view is drawn. The old list is still there as Liste.
+
+Søren said "just like the original app", which I have not seen: `slqdk/LogMyLife` could not
+be reached from here. This one is my own reading until there is a screenshot or a repo.
+
+Entries take pictures, film and other files (`files.py`), up to 1 GB each. Originals are kept
+as they came, and the page shows a copy of 1800 px and a thumbnail of 480 px without EXIF.
+`GET /export` gives a zip with everything (a page to read offline, JSON, CSV, a calendar
+file and the originals), or the JSON, CSV or calendar file alone, by period and search.
+
+Strava's zip goes in whole. Its columns and dates follow the account's language, and a real
+export turned out to be Danish, which the first version refused; English and Danish work
+now. Dates are UTC: a real export's tracks start on the second their rows say. The second
+Distance column is the one to read, always metres. Every filled column stays in `raw`.
+
 ## Not verified
 
 - The Docker image, `proxmox/create-lxc.sh` and the go2rtc image have never run: no
@@ -93,8 +113,6 @@ section registry, `update.sh`), same as SLQ Hub and FamilyLog.
   audio is left out on purpose, and how fast a frame arrives is unmeasured.
 - YouTube: the RSS feed answered 404 from where this was built, and neither it nor the
   Data API has run against the real thing. The keep rules ran on real titles.
-- Strava: the date format in `activities.csv` is from second-hand descriptions, and
-  dates are read as UTC.
 - SLQ DL's dates were read from the linked pages, not checked against a second
   source one by one. One is inferred: NBC naming Leno, 6 June 1991. The source says
   "two weeks later" than 23 May and cites a New York Times article of 7 June.
