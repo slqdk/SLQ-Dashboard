@@ -13,8 +13,8 @@ from pathlib import Path
 import pytest
 
 BACKEND = Path(__file__).resolve().parent.parent
-_PINS = ("APP_DKLIVE_URL", "APP_DKLIVE_LINK", "APP_FAMILYLOG_URL", "APP_PUBLIC_URL", "APP_TIMEZONE",
-         "APP_GOOGLE_CLIENT_ID", "APP_GOOGLE_CLIENT_SECRET")
+_PINS = ("APP_FAMILYLOG_URL", "APP_PUBLIC_URL", "APP_TIMEZONE", "APP_GOOGLE_CLIENT_ID", "APP_GOOGLE_CLIENT_SECRET",
+         "APP_LIVE_MOCK")
 
 
 @pytest.fixture(scope="session", autouse=True)

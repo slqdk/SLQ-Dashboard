@@ -232,7 +232,14 @@ const MAP_LAYERS: [string, string][] = [
   ['radar', 'Regnradar'], ['forecast', 'Vejrudsigt'], ['wind', 'Vind (DMI)'], ['sealevel', 'Vandstand'],
   ['flow', 'Trafiktæthed'], ['trains', 'Tog'], ['flights', 'Fly'], ['military', 'Militærfly'],
   ['airports', 'Lufthavne'], ['ships', 'Skibe'], ['webcams', 'Webcams'], ['navwarnings', 'Navigationsadvarsler'],
-  ['interconnect', 'Elforbindelser'], ['energy', 'Strøm DK1'],
+  ['interconnect', 'Elforbindelser'], ['energy', 'Strøm'],
+]
+
+const MAP_KEYS: { name: string; label: string; href: string; site: string; gives: string }[] = [
+  { name: 'aisstreamKey', label: 'AISStream', href: 'https://aisstream.io', site: 'aisstream.io', gives: 'skibe' },
+  { name: 'rejseplanenKey', label: 'Rejseplanen', href: 'https://labs.rejseplanen.dk', site: 'labs.rejseplanen.dk', gives: 'tog' },
+  { name: 'tomtomKey', label: 'TomTom', href: 'https://developer.tomtom.com', site: 'developer.tomtom.com', gives: 'trafiktæthed' },
+  { name: 'windyKey', label: 'Windy Webcams', href: 'https://api.windy.com/keys', site: 'api.windy.com', gives: 'webcams' },
 ]
 
 interface Device {
@@ -372,10 +379,10 @@ function SetupPage({ onAuthLost }: { onAuthLost: () => void }) {
   const save = async (e: React.FormEvent) => {
     e.preventDefault()
     const keys = ['publicUrl', 'timezone', 'homeName', 'homeLat', 'homeLon', 'googleClientId',
-      'dkliveUrl', 'dkliveLink', 'dkliveLayers', 'familylogUrl', 'go2rtcUrl', 'nordnetMode']
+      'dkliveLayers', 'priceArea', 'photoContact', 'familylogUrl', 'go2rtcUrl', 'nordnetMode']
     const body: Record<string, unknown> = {}
     for (const key of keys) if (!pins[key]) body[key] = form[key]
-    for (const key of ['googleClientSecret', 'youtubeApiKey']) {
+    for (const key of ['googleClientSecret', 'youtubeApiKey', ...MAP_KEYS.map((k) => k.name)]) {
       if (form[key] && !pins[key]) body[key] = form[key]
     }
     body.newsFeeds = feeds.filter((f) => f.url.trim())
@@ -427,10 +434,8 @@ function SetupPage({ onAuthLost }: { onAuthLost: () => void }) {
       </fieldset>
 
       <fieldset>
-        <legend>DK live</legend>
+        <legend>DK live og kortet</legend>
         {status('dklive')}
-        <Field label="Adresse, som serveren læser" name="dkliveUrl" form={form} pins={pins} onChange={change} hint="Fx http://<lxc-ip>:4200" />
-        <Field label="Adresse til kortet i browseren" name="dkliveLink" form={form} pins={pins} onChange={change} hint="Tom = samme adresse" />
         <div>
           <p className="toggles-title">På kortet på overblikket</p>
           <div className="toggles">
@@ -445,8 +450,24 @@ function SetupPage({ onAuthLost }: { onAuthLost: () => void }) {
               )
             })}
           </div>
-          <p className="note">Kortet viser kun ting fra de seneste 6 timer. Tryk Gem opsætning for at bruge valget.</p>
+          <p className="note">Kortet viser kun ting fra de seneste 6 timer. Et lag, der er slået fra, hentes slet ikke. Tryk Gem opsætning for at bruge valget.</p>
         </div>
+        <div className="form-row top">
+          <label>Elområde
+            <select value={String(form.priceArea ?? 'DK1')} onChange={(e) => change('priceArea', e.target.value)}>
+              <option value="DK1">DK1, Jylland og Fyn</option>
+              <option value="DK2">DK2, Sjælland</option>
+            </select>
+          </label>
+          <Field label="Kontakt til Planespotters" name="photoContact" form={form} pins={pins} onChange={change} hint="En adresse eller e-mail. Tom = ingen flyfotos." />
+        </div>
+        {MAP_KEYS.map((k) => (
+          <div key={k.name}>
+            <Secret label={`${k.label}, til ${k.gives}`} name={k.name} setup={data} value={String(form[k.name] ?? '')} onChange={change} />
+            <p className="note">Gratis nøgle fra <a href={k.href} target="_blank" rel="noreferrer noopener">{k.site}</a>.</p>
+          </div>
+        ))}
+        <p className="note">Resten af kortet kræver ingen nøgler. Nøglerne bliver på serveren.</p>
       </fieldset>
 
       <fieldset>

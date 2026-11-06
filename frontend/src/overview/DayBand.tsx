@@ -7,11 +7,12 @@ import type { CalendarBlock, CalendarEvent, DkLive, F1Block, HourWeather, PriceP
 // scope. Elpris, vejr and the calendar line up under one cursor; hover (or the
 // arrow keys) moves it, and each channel's value stands in the left margin.
 
-const GUTTER = 118
-const RIGHT = 14
-const AXIS = 26
+const GUTTER = 104
+const RIGHT = 12
+const AXIS = 16
 const LANES = 3
-const ROWS = { calendar: 88, price: 60, temp: 50, rain: 32 }
+const LANE = 15
+const ROWS = { calendar: 47, price: 30, temp: 26, rain: 14 }
 const HOUR = 3_600_000
 
 interface Block {
@@ -94,13 +95,13 @@ export function DayBand({ now, dk, calendar, f1 }: Props) {
     temp: AXIS + ROWS.calendar + ROWS.price,
     rain: AXIS + ROWS.calendar + ROWS.price + ROWS.temp,
   }
-  const height = rowY.rain + ROWS.rain + 4
+  const height = rowY.rain + ROWS.rain + 2
 
   // ---- the price: a step line, because a price holds for its whole slot ----
   const seen = prices.filter((p) => ms(p.t) + 15 * 60_000 > from && ms(p.t) < to)
   const priceMin = Math.min(0, ...seen.map((p) => p.dkk))
   const priceMax = Math.max(0.1, ...seen.map((p) => p.dkk))
-  const py = (v: number) => rowY.price + ROWS.price - 10 - ((v - priceMin) / (priceMax - priceMin)) * (ROWS.price - 24)
+  const py = (v: number) => rowY.price + ROWS.price - 4 - ((v - priceMin) / (priceMax - priceMin)) * (ROWS.price - 14)
   let pricePath = ''
   seen.forEach((p, i) => {
     const left = x(Math.max(ms(p.t), from))
@@ -118,7 +119,7 @@ export function DayBand({ now, dk, calendar, f1 }: Props) {
   const tMin = Math.min(...temps.map((h) => h.temp as number))
   const tMax = Math.max(...temps.map((h) => h.temp as number))
   const tSpan = Math.max(4, tMax - tMin)
-  const ty = (v: number) => rowY.temp + ROWS.temp - 12 - ((v - tMin) / tSpan) * (ROWS.temp - 26)
+  const ty = (v: number) => rowY.temp + ROWS.temp - 5 - ((v - tMin) / tSpan) * (ROWS.temp - 10)
   const tempPath = temps.map((h, i) => `${i === 0 ? 'M' : 'L'}${x(ms(h.t)).toFixed(1)} ${ty(h.temp as number).toFixed(1)}`).join('')
 
   // ---- the rain ----
@@ -165,7 +166,7 @@ export function DayBand({ now, dk, calendar, f1 }: Props) {
   }
 
   const fit = (text: string, px: number) => {
-    const chars = Math.floor(px / 6.6)
+    const chars = Math.floor(px / 5.6)
     if (text.length <= chars) return text
     return chars < 8 ? '' : `${text.slice(0, chars - 1).trimEnd()}…`
   }
@@ -181,13 +182,13 @@ export function DayBand({ now, dk, calendar, f1 }: Props) {
         {nights.map((n, i) => {
           const a = Math.max(x(n.a), GUTTER)
           const b = Math.min(x(n.b), GUTTER + plotW)
-          return b > a ? <rect key={i} x={a} y={AXIS} width={b - a} height={height - AXIS - 4} className="band-night" /> : null
+          return b > a ? <rect key={i} x={a} y={AXIS} width={b - a} height={height - AXIS - 2} className="band-night" /> : null
         })}
 
         {ticks.map((tick) => (
           <g key={tick.t}>
-            <line x1={x(tick.t)} x2={x(tick.t)} y1={AXIS} y2={height - 4} className={tick.midnight ? 'band-grid strong' : 'band-grid'} />
-            <text x={x(tick.t) + 4} y={17} className={tick.midnight ? 'band-tick strong' : 'band-tick'}>
+            <line x1={x(tick.t)} x2={x(tick.t)} y1={AXIS} y2={height - 2} className={tick.midnight ? 'band-grid strong' : 'band-grid'} />
+            <text x={x(tick.t) + 3} y={12} className={tick.midnight ? 'band-tick strong' : 'band-tick'}>
               {tick.midnight ? cap(shortDay(new Date(tick.t))) : String(new Date(tick.t).getHours()).padStart(2, '0')}
             </text>
           </g>
@@ -201,19 +202,19 @@ export function DayBand({ now, dk, calendar, f1 }: Props) {
         {blocks.map((b, i) => {
           const left = Math.max(x(b.start), GUTTER)
           const right = Math.min(x(b.end), GUTTER + plotW)
-          const y = rowY.calendar + 6 + b.lane * 26
-          const inside = fit(b.title, right - left - 12)
+          const y = rowY.calendar + 2 + b.lane * LANE
+          const inside = fit(b.title, right - left - 8)
           // Too short for its name: the name goes beside it when there is room.
           const after = blocks.slice(i + 1).find((o) => o.lane === b.lane)
           const room = (after ? Math.max(x(after.start), GUTTER) : GUTTER + plotW) - right - 8
           const beside = inside ? '' : fit(b.title, room)
           return (
             <g key={i}>
-              <rect x={left} y={y} width={Math.max(3, right - left - 2)} height={22} rx={3} className={`band-block ${b.kind}`}
+              <rect x={left} y={y} width={Math.max(3, right - left - 2)} height={13} rx={2} className={`band-block ${b.kind}`}
                 style={b.color ? { fill: b.color, fillOpacity: b.kind === 'allday' ? 0.5 : 1 } : undefined} />
-              {inside && <text x={left + 6} y={y + 15} className={`band-block-text ${b.kind}`}
+              {inside && <text x={left + 4} y={y + 10} className={`band-block-text ${b.kind}`}
                 style={b.color && b.kind === 'event' ? { fill: inkOn(b.color) } : undefined}>{inside}</text>}
-              {beside && <text x={right + 4} y={y + 15} className="band-block-text beside">{beside}</text>}
+              {beside && <text x={right + 3} y={y + 10} className="band-block-text beside">{beside}</text>}
             </g>
           )
         })}
@@ -222,38 +223,38 @@ export function DayBand({ now, dk, calendar, f1 }: Props) {
         {pricePath && <path d={pricePath} className="band-price" />}
         {low && high && low !== high && (
           <>
-            <text x={Math.min(x(ms(high.t)) + 4, GUTTER + plotW - 34)} y={py(high.dkk) - 4} className="band-note">{kr(high.dkk)}</text>
-            <text x={Math.min(x(ms(low.t)) + 4, GUTTER + plotW - 34)} y={py(low.dkk) + 12} className="band-note">{kr(low.dkk)}</text>
+            <text x={Math.min(x(ms(high.t)) + 4, GUTTER + plotW - 34)} y={py(high.dkk) - 2} className="band-note">{kr(high.dkk)}</text>
+            <text x={Math.min(x(ms(low.t)) + 4, GUTTER + plotW - 34)} y={py(low.dkk) + 9} className="band-note">{kr(low.dkk)}</text>
           </>
         )}
 
         {tempPath && <path d={tempPath} className="band-temp" />}
 
         {rain.map((h) => {
-          const barH = Math.max(2, ((h.rain as number) / rainMax) * (ROWS.rain - 10))
+          const barH = Math.max(2, ((h.rain as number) / rainMax) * (ROWS.rain - 2))
           return <path key={h.t} className="band-rain"
             d={`M${x(ms(h.t)) - barW / 2} ${rowY.rain + ROWS.rain}v${-barH + 2}q0 -2 2 -2h${barW - 4}q2 0 2 2v${barH - 2}z`} />
         })}
 
         {/* Now, and the cursor */}
-        <line x1={x(nowT)} x2={x(nowT)} y1={AXIS - 6} y2={height - 4} className="band-now" />
-        <text x={x(nowT)} y={AXIS - 9} textAnchor="middle" className="band-now-label">nu</text>
+        <line x1={x(nowT)} x2={x(nowT)} y1={AXIS} y2={height - 2} className="band-now" />
+        <text x={x(nowT)} y={12} textAnchor="middle" className="band-now-label">nu</text>
         {cursor != null && (
           <>
-            <line x1={x(cursor)} x2={x(cursor)} y1={AXIS} y2={height - 4} className="band-cursor" />
-            <text x={Math.min(x(cursor) + 6, GUTTER + plotW - 80)} y={AXIS + 13} className="band-cursor-label">
+            <line x1={x(cursor)} x2={x(cursor)} y1={AXIS} y2={height - 2} className="band-cursor" />
+            <text x={Math.min(x(cursor) + 6, GUTTER + plotW - 80)} y={12} className="band-cursor-label">
               {cap(shortDay(new Date(cursor)))} {clock(new Date(cursor))}
             </text>
           </>
         )}
 
         {/* The left margin */}
-        <rect x={0} y={AXIS} width={GUTTER - 1} height={height - AXIS - 4} className="band-margin" />
+        <rect x={0} y={AXIS} width={GUTTER - 1} height={height - AXIS - 2} className="band-margin" />
         <Margin y={rowY.calendar} h={ROWS.calendar} swatch="cal" name="Kalender"
-          value={onNow.length ? fit(onNow[0].title, GUTTER - 26) : next ? clock(new Date(next.start)) : 'Intet'} small={onNow.length > 0} />
-        <Margin y={rowY.price} h={ROWS.price} swatch="price" name="Elpris, kr/kWh" value={price ? kr(price.dkk) : '–'} />
-        <Margin y={rowY.temp} h={ROWS.temp} swatch="temp" name="Temperatur" value={hour?.temp != null ? `${one(hour.temp)}°` : '–'} />
-        <Margin y={rowY.rain} h={ROWS.rain} swatch="rain" name="Regn" value={hour?.rain != null ? `${one(hour.rain)} mm` : '–'} inline />
+          value={onNow.length ? 'Nu' : next ? clock(new Date(next.start)) : 'Intet'} />
+        <Margin y={rowY.price} h={ROWS.price} swatch="price" name="Elpris" value={price ? kr(price.dkk) : '–'} />
+        <Margin y={rowY.temp} h={ROWS.temp} swatch="temp" name="Temp." value={hour?.temp != null ? `${one(hour.temp)}°` : '–'} />
+        <Margin y={rowY.rain} h={ROWS.rain} swatch="rain" name="Regn" value={hour?.rain != null ? `${one(hour.rain)} mm` : '–'} />
       </svg>
       {!dk?.power && !dk?.weather && (
         <p className="band-empty">Elpris og vejr kommer fra DK live, som ikke svarer endnu.</p>
@@ -262,23 +263,12 @@ export function DayBand({ now, dk, calendar, f1 }: Props) {
   )
 }
 
-function Margin({ y, h, swatch, name, value, small, inline }: {
-  y: number; h: number; swatch: string; name: string; value: string; small?: boolean; inline?: boolean
-}) {
-  if (inline) {
-    return (
-      <g>
-        <rect x={0} y={y + h / 2 - 6} width={3} height={12} className={`band-swatch ${swatch}`} />
-        <text x={12} y={y + h / 2 + 4} className="band-name">{name}</text>
-        <text x={GUTTER - 10} y={y + h / 2 + 5} textAnchor="end" className="band-value small">{value}</text>
-      </g>
-    )
-  }
+function Margin({ y, h, swatch, name, value }: { y: number; h: number; swatch: string; name: string; value: string }) {
   return (
     <g>
-      <rect x={0} y={y + 10} width={3} height={h - 20} className={`band-swatch ${swatch}`} />
-      <text x={12} y={y + 19} className="band-name">{name}</text>
-      <text x={12} y={y + 44} className={small ? 'band-value small' : 'band-value'}>{value}</text>
+      <rect x={0} y={y + h / 2 - 5} width={3} height={10} className={`band-swatch ${swatch}`} />
+      <text x={9} y={y + h / 2 + 4} className="band-name">{name}</text>
+      <text x={GUTTER - 7} y={y + h / 2 + 5} textAnchor="end" className="band-value">{value}</text>
     </g>
   )
 }

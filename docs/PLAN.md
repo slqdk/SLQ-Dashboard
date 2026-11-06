@@ -7,8 +7,8 @@ Last updated 2026-11-06. Read this before changing anything.
 | Topic | Decision |
 |---|---|
 | Shape | An overview page with info from all sections, then a page per section |
-| Overview, from 2026-11-06 | Date to the far left, clock to the far right, Dagsbåndet between them. dk-live's map in the middle. News, stocks and F1 fixed to the bottom. No Kalender or DK live blocks: the band carries the calendar, the map carries DK live |
-| The map | dk-live's own map, only things from the last 6 hours, with a toggle for each of its layers under Admin → Opsætning → DK live |
+| Overview, from 2026-11-06 | The map of Denmark is the background and can be zoomed, and everything else lies on top of it. Date to the far left, clock to the far right, Dagsbåndet between them, and that top bar low. News, stocks and F1 fixed to the bottom. No Kalender or DK live blocks: the band carries the calendar, the map carries DK live |
+| The map | "Modificeret til den her app": built into the dashboard, not dk-live in a frame, with the API keys entered again in Admin. Only things from the last 6 hours, with a toggle for each layer under Admin → Opsætning → DK live og kortet |
 | Aktier | A weekly graph of what he holds |
 | Target | Desktop PCs. Phones only have to work |
 | Platform | A new system of its own, in its own Proxmox container |
@@ -42,11 +42,11 @@ section registry, `update.sh`), same as SLQ Hub and FamilyLog.
 
 | Section | State |
 |---|---|
-| Overview | Works. Date, clock, a sentence built from the data, Dagsbåndet on top, dk-live's map in the middle with blocks either side, news, stocks and F1 at the bottom. Fits the window from 880 px high; below that the page scrolls |
-| Ping indicator | Works. Browser → server round trip, page load; server → Cloudflare, Google, dk-live, FamilyLog by TCP connect; load average |
+| Overview | Works. The map fills the window under the panels: date, clock, a sentence built from the data and Dagsbåndet on top, blocks either side, news, stocks and F1 at the bottom. Fits the window; the side columns scroll if they must |
+| Ping indicator | Works. Browser → server round trip, page load; server → Cloudflare, Google, FamilyLog by TCP connect; load average |
 | Admin | Works. Users, roles, sections per user, passwords, sign out, setup of everything, lists of printers and cameras |
 | Kalender | Works, run against real Google. Every ticked calendar in Google's colours, the main one also goes to LogMyLife |
-| DK live | Works, run against a real dk-live |
+| DK live | Works. Every source lives here now, and those without a key ran against the real thing and matched dk-live's own counts. Prices, weather, traffic, 112 and police need no setup |
 | Nyheder | Works, run against real DR and TV 2 feeds |
 | LogMyLife | Timeline, own entries, sharing, on this day, Google and FamilyLog ingest, Strava export import. No photos yet |
 | Formel 1 | Works, run against real Jolpica |
@@ -81,8 +81,10 @@ section registry, `update.sh`), same as SLQ Hub and FamilyLog.
   logo would mean verification. The API answers in Google's classic palette, so
   `core/google.py` maps to the modern one. Someone who chose classic in Google's own
   settings sees other shades than here.
-- The dk-live map: the branch ran in Chrome through the dashboard against real feeds, but
-  dk-live's own Docker build has not. The layout was checked at 1920 × 1000.
+- The four sources with a key have not run against the real thing: AISStream, Rejseplanen,
+  TomTom and Windy. Their shapes are dk-live's, run against stand-ins, and ships over a real
+  local websocket. Overpass does not answer from where this was built, so the fire stations
+  ran against a stand-in; 112 alarms were placed through Nominatim meanwhile, which works.
 - Real Bambu printers. Field names and the 5-minute rule are from OpenBambuAPI. Firmware
   since early 2025 restricts third-party control; monitoring is reported to work, and
   some setups may need LAN mode or Developer Mode.
@@ -98,23 +100,27 @@ section registry, `update.sh`), same as SLQ Hub and FamilyLog.
 
 ## Open
 
-### Waiting for a merge (needs Søren)
-No PRs could be opened from where this was built, so it is pushed as a branch:
-- **dk-live `embed-map`**: `?embed=1&hours=6&layers=...` hides the menus, fetches only the
-  named layers and leaves out what is older than `hours`, and every address in the client
-  is relative. Without it the overview's map has no data, because the client asks for
-  `/api/...` at the dashboard's root.
+### How the map works
+dk-live's sources moved into `sections/dklive/`, one module per source, and its 18 layers
+into `frontend/src/map/`, so the dashboard needs no other container. dk-live goes on
+running on its own; its `embed-map` branch was overtaken by this and does not need merging.
+The keys are `aisstreamKey`, `rejseplanenKey`, `tomtomKey` and `windyKey`, in Admin. The
+rest needs no key. A layer that is off is not fetched, and `jobs.kick()` starts one that
+is switched on.
 
-### How the map gets to the overview
-An iframe of `/api/s/dklive/map/index.html`, which the dashboard passes through to dk-live.
-Same address means https stays https, with no mixed content, and the map stays behind the
-login. It also means nothing new has to be opened to the outside. dk-live trusts its home
-network and the dashboard is on it, so only the paths in `MAP_FEEDS` get through: not its
-settings and not its log. A test holds it to that.
+The panels lie on top, so the map is told what they leave free (`.map-free`): `setPadding`
+keeps Denmark, the buttons, the zoom and the popups in that part, and it refits until
+someone moves the map. `DK` goes back to the whole map. On a phone the map is a block of
+its own above the panels.
 
-Time limits: alarms and lightning by their time, traffic by when it last changed, Autobahn
-and navigation warnings by their start. Things with a position right now (planes, ships,
-trains) and things that are simply there (webcams, airports) are not filtered.
+Time limits, in `client.recent`: alarms and lightning by their time, traffic by when it
+last changed, Autobahn and navigation warnings by their start. Things with a position right
+now (planes, ships, trains) and things that are simply there (webcams, airports) are not
+filtered. The DK live page keeps all of it.
+
+Left behind in dk-live: the 112 statistics and CSV, the police panel's full texts, the radar
+player (the map shows the newest picture), "Min position", and the sliders for icon sizes.
+The two own webcams from `webcams-dk.json` are in `webcams.py`.
 
 ### Strava API (needs Søren)
 The export needs no subscription and works now. The API has needed a paid Strava
@@ -144,7 +150,7 @@ fresh as the last import.
 
 ### Next, roughly in order
 1. Finish the deploy on CT 109, then the real Google connect
-2. Merge the two branches above and set the FamilyLog keys
+2. Enter the map's keys in Admin, and set the FamilyLog keys
 3. Add the real printers and cameras in Admin, and fix what they turn up
 4. Whatever real use of the new overview turns up
 5. Photos on LogMyLife entries (FamilyLog's `_process`: resized, EXIF stripped)

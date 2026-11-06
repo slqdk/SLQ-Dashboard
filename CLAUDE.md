@@ -10,10 +10,13 @@ Proxmox LXC. **Read `docs/PLAN.md` first: decisions, what is built, what is open
   (read-only OAuth + Calendar), `netwatch` (the server half of the ping indicator).
 - `backend/app/sections/<id>/` — one package per section, each exporting `SECTION`
   (see `core/sections.py`). API under `/api/s/<id>/`; access is checked once, in
-  the middleware in `main.py`. Registry: `sections/__init__.py`.
+  the middleware in `main.py`. Registry: `sections/__init__.py`. `sections/dklive/` holds
+  one module per live source, each a job that keeps its newest result in memory.
 - `frontend/src/` — React + TypeScript + Vite. `overview/` is the front page,
-  `sections/` one component per section, `admin/` users and setup.
-- `tools/mock_upstreams.py` — stand-ins for dk-live, Jolpica, RSS, Google and go2rtc.
+  `map/` the MapLibre map behind it with one file per layer, `sections/` one component
+  per section, `admin/` users and setup.
+- `tools/mock_upstreams.py` — stand-ins for every live source (`APP_LIVE_MOCK`), Jolpica,
+  RSS, Google and go2rtc.
   `tools/mock_printer.py` — a stand-in Bambu printer, real TLS and MQTT.
   `tools/browser_check.mjs` — a walk through the app in a real browser.
 
@@ -21,9 +24,11 @@ Proxmox LXC. **Read `docs/PLAN.md` first: decisions, what is built, what is open
 - **Google is read only.** One scope, `calendar.readonly`. Nothing writes to Google.
 - **FamilyLog is read only.** `sections/familylog/client.py` only ever uses GET;
   a test parses the file to hold it to that.
-- **dk-live's map only reads, and only its map.** It passes through
-  `/api/s/dklive/map`, where `MAP_FEEDS` decides what gets through: dk-live trusts its
-  home network, so its settings and log must stay out of reach.
+- **The map's keys stay on the server.** AISStream, Rejseplanen, TomTom and Windy are
+  called from the backend and TomTom's tiles pass through it. A failing source is recorded
+  by the kind of error (`source.why`), never its text: httpx puts the address in the text,
+  and an address can hold a key. The map shows the last 6 hours, in `client.recent`, and
+  a layer that is off is not fetched.
 - **Printers are read only.** `sections/printers/watcher.py` publishes one thing,
   `pushall`, and at most every five minutes; a test parses the file to hold it to that.
 - **Camera logins stay in memory.** Streams go to go2rtc with PATCH, never PUT, which

@@ -29,8 +29,8 @@ const page = await context.newPage()
 const problems = []
 page.on('pageerror', (e) => problems.push(`pageerror: ${e.message}`))
 page.on('console', (m) => {
-  // The check provokes 400, 401, 403 and 503 on purpose.
-  if (m.type() === 'error' && !/favicon|status of (40[013]|503)/.test(m.text())) problems.push(`console: ${m.text()}`)
+  // The check provokes 400, 401, 403 and 503 on purpose, and a 404 from a layer that does not exist.
+  if (m.type() === 'error' && !/favicon|status of (40[013]|503)/.test(m.text()) && !m.location().url.endsWith('/map/settings')) problems.push(`console: ${m.text()} ${m.location().url}`)
 })
 
 const shot = async (name) => {
@@ -69,10 +69,16 @@ const urls = page.locator('.form-row.feed input').nth(1)
 await urls.fill(`${MOCK}/rss/DR`)
 await page.locator('.form-row.feed input').nth(3).fill(`${MOCK}/rss/TV2`)
 await page.locator('fieldset:has(legend:has-text("Nordnet")) select').selectOption('csv')
-check(await page.locator('.toggles input').count() === 18, 'a toggle for every layer on dk-live')
-await page.locator('.toggles label:has-text("Skibe") input').check()
+check(await page.locator('.toggles input').count() === 18, 'a toggle for every layer on the map')
+for (const toggle of await page.locator('.toggles input').all()) await toggle.check()
+await page.locator('fieldset:has(legend:has-text("DK live")) input[type="password"]').nth(0).fill('mock-ais-key-1')
+await page.locator('fieldset:has(legend:has-text("DK live")) input[type="password"]').nth(1).fill('mock-rejse-key-2')
+await page.locator('fieldset:has(legend:has-text("DK live")) input[type="password"]').nth(2).fill('mock-tomtom-key-3')
+await page.locator('fieldset:has(legend:has-text("DK live")) input[type="password"]').nth(3).fill('mock-windy-key-4')
 await page.click('button:has-text("Gem opsætning")')
 await page.waitForSelector('text=Gemt.')
+const setup = await page.evaluate(async () => (await fetch('/api/admin/setup')).text())
+check(!setup.includes('mock-windy-key-4') && setup.includes('"windyKeySet":true'), 'a key does not come back to the browser')
 check(true, 'setup saved')
 check(await page.locator('input[disabled]').count() >= 3, 'values pinned by the container show locked')
 
@@ -249,11 +255,81 @@ await shot('familylog')
 await go('')
 await page.waitForSelector('.band svg')
 await page.waitForSelector('.block:has-text("Nyheder") .headlines li')
-await page.frameLocator('.map-frame iframe').locator('text=dk-lives kort').waitFor()
-check(true, "dk-live's map comes through the dashboard")
-check((await page.getAttribute('.map-frame iframe', 'src')).includes('hours=6'), 'the map only shows the last six hours')
-const blocked = await page.evaluate(async () => [(await fetch('/api/s/dklive/map/api/settings')).status, (await fetch('/api/s/dklive/map/api/logs')).status])
-check(blocked.join() === '403,403', "dk-live's settings and log stay out of reach")
+await page.waitForFunction(() => window.slqMap?.getSource('flights'), null, { timeout: 45_000 })
+check(true, 'the map is in the dashboard itself')
+check(await page.locator('iframe').count() === 0, 'and no longer a frame')
+const hit = await page.evaluate(() => {
+  const r = document.querySelector('.map-free').getBoundingClientRect()
+  return document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2).className
+})
+check(hit.includes('maplibregl-canvas'), 'the free part in the middle is the map itself')
+const fits = await page.evaluate(() => {
+  const free = document.querySelector('.map-free').getBoundingClientRect()
+  const box = document.querySelector('.map-background').getBoundingClientRect()
+  const m = window.slqMap
+  const west = m.project([7.5, 57.9]), east = m.project([13, 53.3])
+  return { left: box.left + west.x >= free.left - 1, right: box.left + east.x <= free.right + 1, top: box.top + west.y >= free.top - 1, bottom: box.top + east.y <= free.bottom + 1 }
+})
+check(Object.values(fits).every(Boolean), `Denmark lies in the free part ${JSON.stringify(fits)}`)
+const features = async (source) => page.evaluate((s) => window.slqMap.getSource(s)?.serialize().data?.features?.length ?? 0, source)
+const LAYER_SOURCES = ['flights', 'military', 'ships', 'alarms', 'traffic', 'autobahn', 'trains', 'webcams', 'airports', 'wind', 'sealevel', 'navwarn', 'lightning', 'ic-lines']
+await page.waitForFunction((list) => list.every((s) => (window.slqMap.getSource(s)?._data?.features?.length ?? 0) > 0), LAYER_SOURCES, { timeout: 45_000 }).catch(() => {})
+for (const source of LAYER_SOURCES) check(await features(source) > 0, `the map has ${source}`)
+const traffic = await page.evaluate(() => window.slqMap.getSource('traffic').serialize().data.features.map((f) => f.properties.title))
+check(traffic.length === 2 && !traffic.some((t) => t.includes('gammelt')), 'only what happened in the last six hours')
+const zoomBefore = await page.evaluate(() => window.slqMap.getZoom())
+const middle = await page.locator('.map-free').boundingBox()
+await page.mouse.move(middle.x + middle.width / 2, middle.y + middle.height / 2)
+await page.mouse.wheel(0, -400)
+await page.waitForFunction((z) => window.slqMap.getZoom() > z + 0.1, zoomBefore, { timeout: 5000 })
+check(true, 'the map zooms')
+await page.click('.map-home')
+await page.waitForFunction((z) => Math.abs(window.slqMap.getZoom() - z) < 0.01, zoomBefore, { timeout: 5000 })
+check(true, 'and goes back to the whole of Denmark')
+// Every popup, through the same click a person makes.
+const openPopup = async (layer, source) => {
+  await page.evaluate(() => document.querySelector('.maplibregl-popup-close-button')?.click())
+  await page.evaluate((s) => {
+    const m = window.slqMap
+    const f = m.getSource(s).serialize().data.features[0]
+    const center = f.geometry.type === 'Point' ? f.geometry.coordinates : f.geometry.coordinates.flat(3).slice(0, 2)
+    window.popupAt = center
+    m.jumpTo({ center, zoom: 9 })
+  }, source)
+  await page.waitForTimeout(500)
+  const point = await page.evaluate(() => {
+    const b = document.querySelector('.map-background').getBoundingClientRect()
+    const c = window.slqMap.project(window.popupAt)
+    return [b.left + c.x, b.top + c.y]
+  })
+  await page.mouse.click(point[0], point[1])
+  await page.waitForSelector('.popup', { timeout: 3000 }).catch(() => {})
+  await page.waitForTimeout(350)
+  return (await page.locator('.popup').count()) ? page.textContent('.popup') : ''
+}
+const POPUPS = [['flights-icon', 'flights', 'EKS123'], ['military-icon', 'military', 'militær'], ['ships-icon', 'ships', 'Fragt'], ['alarms-hit', 'alarms', 'odin.dk'],
+  ['traffic-hit', 'traffic', 'Opdateret'], ['autobahn-hit', 'autobahn', 'A7'], ['trains-icon', 'trains', 'Retning'], ['webcams-hit', 'webcams', 'Autobahn GmbH'],
+  ['airports-hit', 'airports', 'Baner'], ['wind-arrow', 'wind', 'Vindstød'], ['sealevel-dot', 'sealevel', 'DVR90'], ['ic-arrow', 'ic-mid', 'Flow'], ['navwarn-dot', 'navwarn', 'Navigationsadvarsel']]
+for (const [layer, source, word] of POPUPS) {
+  const text = await openPopup(layer, source)
+  check(text.includes(word), `a popup on ${layer}: ${text.slice(0, 60)}`)
+  if (layer === 'flights-icon') await shot('map-popup')
+}
+await page.evaluate(() => document.querySelector('.maplibregl-popup-close-button')?.click())
+await page.click('.map-home')
+await page.waitForTimeout(300)
+const sea = await page.evaluate(() => { const b = document.querySelector('.map-background').getBoundingClientRect(), p = window.slqMap.project([8.0, 57.5]); return [b.left + p.x, b.top + p.y] })
+await page.mouse.click(sea[0], sea[1])
+await page.waitForSelector('.popup.forecast .fchart', { timeout: 8000 })
+check(true, 'a click on the map itself gives the weather there')
+await page.click('.popup.forecast button[data-tab="days"]')
+check(await page.locator('.popup.forecast table.days tr').count() === 3, 'and three days of it')
+await shot('map-forecast')
+await page.evaluate(() => document.querySelector('.maplibregl-popup-close-button')?.click())
+const secrets = await page.evaluate(async () => (await Promise.all(['ships', 'trains', 'webcams', 'energy', 'airports'].map((f) => fetch(`/api/s/dklive/map/${f}`).then((r) => r.text())))).join())
+check(!/mock-(ais|rejse|tomtom|windy)-key/.test(secrets), 'no key in what the map reads')
+const missing = await page.evaluate(async () => (await fetch('/api/s/dklive/map/settings')).status)
+check(missing === 404, 'the map reads only its layers')
 const bottoms = await page.evaluate(() => {
   const end = document.querySelector('.bottom').getBoundingClientRect()
   return { gap: Math.round(window.innerHeight - end.bottom), side: [...document.querySelectorAll('.bottom .block h2')].map((h) => h.textContent).join() }
@@ -266,7 +342,7 @@ for (const title of ['Nyheder', 'SLQ DL', 'Formel 1', 'LogMyLife', 'Links', 'Akt
 }
 check(/\d\d:\d\d/.test(await page.textContent('.hero-clock time')), 'the clock shows')
 check((await page.textContent('.block:has-text("Links")')).includes('Infosys'), 'pinned link on the overview')
-check((await page.getAttribute('.map-frame iframe', 'src')).includes('ships'), 'a layer ticked in Admin reaches the map')
+check((await page.textContent('.block:has-text("Strøm")')).includes('MW'), 'the power block when Strøm is on')
 check((await page.textContent('.digest')).includes('P1S er færdig kl.'), 'the digest knows when the print is done')
 await page.waitForFunction(() => document.querySelector('.block .cam-frame img')?.naturalWidth > 0)
 check(true, 'a camera on the overview')
@@ -290,7 +366,7 @@ await page.waitForSelector('text=Log ind')
 await page.fill('input[autocomplete="username"]', 'mor')
 await page.fill('input[type="password"]', 'endnu-en-kode-2')
 await page.click('button:has-text("Log ind")')
-await page.waitForSelector('.hero h1')
+await page.waitForSelector('.block h2:has-text("Printere")')
 check(await page.locator('.nav nav a:has-text("Admin")').count() === 0, 'family has no Admin')
 check(await page.locator('.nav nav a:has-text("Aktier")').count() === 0, 'family has no Aktier')
 check(await page.locator('.block h2:has-text("Aktier")').count() === 0, 'nor on the overview')

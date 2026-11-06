@@ -44,25 +44,15 @@ export function DkLive({ onAuthLost }: { onAuthLost: () => void }) {
   const now = useNow(15_000)
   const { data, error } = usePoll<Data>('/api/s/dklive/state', 30, onAuthLost)
   if (!data) return <main className="page"><SectionHead title="DK live" />{error && <p className="problem">{error}</p>}</main>
-  if (!data.configured) {
-    return (
-      <main className="page">
-        <SectionHead title="DK live" text="Elpriser, trafik og opdateringer fra dk-live." />
-        <p className="empty">Sæt adressen til dk-live under Admin → Opsætning.</p>
-      </main>
-    )
-  }
   const p = data.power
   const w = data.weather
   const nextPrices = hourly(p?.series ?? [], now)
   const peak = Math.max(0.01, ...nextPrices.map((x) => x.dkk))
   return (
     <main className="page">
-      <SectionHead title="DK live" text="Elpriser, trafik og opdateringer fra dk-live.">
-        {data.link && <a className="button" href={data.link} target="_blank" rel="noreferrer noopener">Åbn kortet</a>}
-      </SectionHead>
+      <SectionHead title="DK live" text="Elpriser, trafik og opdateringer. Kortet ligger på overblikket." />
       {error && <p className="problem">{error}</p>}
-      {data.error && <p className="problem">dk-live svarer ikke helt: {data.error}</p>}
+      {data.error && <p className="problem">Ikke alle kilder svarer: {data.error}</p>}
       <div className="columns">
         <div>
           <h2>Opdateringer</h2>

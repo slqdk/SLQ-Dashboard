@@ -37,10 +37,15 @@ DEFAULTS: dict = {
     # ---- Google (read only) ----
     "googleClientId": "",
     "googleClientSecret": "",   # never sent back to the browser
-    # ---- other apps ----
-    "dkliveUrl": "",            # the server reads it: http://<lxc-ip>:4200
-    "dkliveLink": "",           # the browser opens it; empty = dkliveUrl
+    # ---- DK live: the map ----
     "dkliveLayers": ["alarms", "traffic", "lightning", "radar"],    # on the overview's map
+    "priceArea": "DK1",         # DK1 Jutland and Funen, DK2 Zealand
+    "aisstreamKey": "",         # ships; never sent back to the browser, like the next three
+    "rejseplanenKey": "",       # trains
+    "tomtomKey": "",            # traffic flow
+    "windyKey": "",             # webcams
+    "photoContact": "",         # Planespotters asks who is calling; no contact, no aircraft photos
+    # ---- other apps ----
     "familylogUrl": "",         # http://30.11.0.108:8081
     # ---- Nyheder ----
     "newsFeeds": DEFAULT_FEEDS,
@@ -58,16 +63,15 @@ ENV_OVERRIDES = {
     "timezone": "APP_TIMEZONE",
     "googleClientId": "APP_GOOGLE_CLIENT_ID",
     "googleClientSecret": "APP_GOOGLE_CLIENT_SECRET",
-    "dkliveUrl": "APP_DKLIVE_URL",
-    "dkliveLink": "APP_DKLIVE_LINK",
     "familylogUrl": "APP_FAMILYLOG_URL",
     "go2rtcUrl": "APP_GO2RTC_URL",
 }
 
-SECRET_KEYS = {"googleClientSecret", "nordnetApiKey", "youtubeApiKey"}
-URL_KEYS = {"publicUrl", "dkliveUrl", "dkliveLink", "familylogUrl", "go2rtcUrl"}
-TEXT_KEYS = {"googleClientId", "homeName"}
+SECRET_KEYS = {"googleClientSecret", "nordnetApiKey", "youtubeApiKey", "aisstreamKey", "rejseplanenKey", "tomtomKey", "windyKey"}
+URL_KEYS = {"publicUrl", "familylogUrl", "go2rtcUrl"}
+TEXT_KEYS = {"googleClientId", "homeName", "photoContact"}
 NORDNET_MODES = ("off", "api", "csv")
+PRICE_AREAS = ("DK1", "DK2")
 DKLIVE_LAYERS = ("flights", "military", "airports", "ships", "flow", "traffic", "trains", "autobahn", "webcams",
                  "alarms", "radar", "forecast", "lightning", "wind", "sealevel", "navwarnings", "interconnect",
                  "energy")
@@ -160,8 +164,12 @@ def _clean(key: str, value):
         return _clean_feeds(value)
     if key == "dkliveLayers":
         if not isinstance(value, list) or any(v not in DKLIVE_LAYERS for v in value):
-            raise Invalid("dkliveLayers skal være en liste af dk-lives lag.")
+            raise Invalid("dkliveLayers skal være en liste af kortets lag.")
         return [v for v in DKLIVE_LAYERS if v in value]
+    if key == "priceArea":
+        if value not in PRICE_AREAS:
+            raise Invalid("priceArea skal være DK1 eller DK2.")
+        return value
     if key == "nordnetMode":
         if value not in NORDNET_MODES:
             raise Invalid("nordnetMode skal være off, api eller csv.")

@@ -6,9 +6,9 @@ sin egen LXC på Proxmox. Lavet til pc'en; på telefonen virker det bare.
 
 | Sektion | Hvad | Kilde |
 |---|---|---|
-| **Overblik** | Dato og tid, Dagsbåndet (kalender, elpris og vejr på én tidsakse), dk-lives kort over de seneste 6 timer, og noget fra hver sektion | Alle |
+| **Overblik** | Danmarkskortet som zoombar baggrund med de seneste 6 timer, og ovenpå dato og tid, Dagsbåndet (kalender, elpris og vejr på én tidsakse) og noget fra hver sektion | Alle |
 | **Kalender** | Din Google-kalender, kun læsning | Google Calendar API, én konto pr. person |
-| **DK live** | Elpriser, trafik og opdateringer, plus link til kortet | Din dk-live-container |
+| **DK live** | Elpriser, trafik og opdateringer. Kortets 18 lag slås til og fra i Admin | Direkte fra kilderne: adsb.lol, AISStream, 112-puls, Vejdirektoratet, Rejseplanen, Autobahn, DMI, Energi Data Service, Politi Update og flere. Fire af dem kræver en gratis nøgle |
 | **Nyheder** | Overskrifter og korte tekster uden reklamer | RSS, hentet af serveren (DR og TV 2 som standard) |
 | **LogMyLife** | Din egen tidslinje, der husker alt | Dine indlæg, Google, Dagbog, FamilyMap, Strava-eksport |
 | **Aktier** | Din beholdning, ugens udvikling, snitkurs, udbytte og resultat pr. år | CSV-udtræk fra Nordnet, som du selv importerer, og kurser fra Yahoo Finance |
@@ -34,7 +34,7 @@ cd backend && pip install -r requirements-dev.txt && python -m pytest -q
 cd frontend && npm ci && npm test && npm run build
 python3 tools/mock_upstreams.py 9100 &                 # falske data
 python3 tools/mock_printer.py 9101 &                   # en falsk printer, kræver cryptography
-cd backend && APP_DATA_DIR=./data APP_DKLIVE_URL=http://127.0.0.1:9100 \
+cd backend && APP_DATA_DIR=./data APP_LIVE_MOCK=http://127.0.0.1:9100 \
   APP_JOLPICA_URL=http://127.0.0.1:9100/jolpica python -m uvicorn app.main:app --port 8080
 cd frontend && npm run dev                             # proxier /api til :8080
 ```

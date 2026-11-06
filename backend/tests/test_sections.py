@@ -331,39 +331,24 @@ def test_next_session_and_weekend(client):
 
 # ---- DK live -----------------------------------------------------------------------
 
-def test_dklive_price_time_is_wall_clock_in_winter_and_summer():
-    from app.sections.dklive.client import price_time
-    # dk-live's time: TimeDK read as UTC.
-    winter = int(datetime(2026, 11, 6, 7, 15, tzinfo=timezone.utc).timestamp() * 1000)
-    assert price_time(winter, None, CPH) == datetime(2026, 11, 6, 6, 15, tzinfo=timezone.utc)
-    summer = int(datetime(2026, 7, 6, 7, 15, tzinfo=timezone.utc).timestamp() * 1000)
-    assert price_time(summer, None, CPH) == datetime(2026, 7, 6, 5, 15, tzinfo=timezone.utc)
-    # After a fix in dk-live, timeBase says so and the value stands.
-    assert price_time(winter, "utc", CPH) == datetime(2026, 11, 6, 7, 15, tzinfo=timezone.utc)
-
-
 def test_current_price_is_the_slot_we_are_in():
     from app.sections.dklive import client as dk
-    dk.reset()
-    wall = lambda h, m: int(datetime(2026, 11, 6, h, m, tzinfo=timezone.utc).timestamp() * 1000)
-    data = {"area": "DK1", "prices": [{"time": wall(6, 0), "dkk": 1.8}, {"time": wall(7, 0), "dkk": 2.4},
-                                      {"time": wall(7, 15), "dkk": 2.43}, {"time": wall(8, 0), "dkk": 1.2}]}
-    now = datetime(2026, 11, 6, 6, 20, tzinfo=timezone.utc)                  # 07:20 in Denmark
-    power = dk.build_power(data, CPH, now)
+    at = lambda h, m: int(datetime(2026, 11, 6, h, m, tzinfo=timezone.utc).timestamp() * 1000)
+    data = {"area": "DK1", "prices": [{"time": at(5, 0), "dkk": 1.8}, {"time": at(6, 0), "dkk": 2.4},
+                                      {"time": at(6, 15), "dkk": 2.43}, {"time": at(7, 0), "dkk": 1.2}]}
+    power = dk.build_power(data, datetime(2026, 11, 6, 6, 20, tzinfo=timezone.utc))
     assert power["now"] == 2.43
     assert power["low"]["dkk"] == 1.2 and power["high"]["dkk"] == 2.43       # from now on, not the past
-    dk.reset()
+    assert [p["dkk"] for p in power["series"]][0] == 1.8                     # earlier today stays on the band
 
 
-def test_earlier_prices_stay_on_the_band():
+def test_prices_older_than_the_band_are_left_out():
     from app.sections.dklive import client as dk
-    dk.reset()
-    wall = lambda h: int(datetime(2026, 11, 6, h, 0, tzinfo=timezone.utc).timestamp() * 1000)
-    now = datetime(2026, 11, 6, 6, 0, tzinfo=timezone.utc)
-    dk.build_power({"prices": [{"time": wall(5), "dkk": 1.0}, {"time": wall(6), "dkk": 2.0}]}, CPH, now)
-    power = dk.build_power({"prices": [{"time": wall(6), "dkk": 2.0}]}, CPH, now + timedelta(hours=1))
-    assert [p["dkk"] for p in power["series"]] == [1.0, 2.0]
-    dk.reset()
+    now = datetime(2026, 11, 6, 12, 0, tzinfo=timezone.utc)
+    old = int((now - timedelta(hours=40)).timestamp() * 1000)
+    fresh = int((now - timedelta(hours=1)).timestamp() * 1000)
+    power = dk.build_power({"prices": [{"time": old, "dkk": 9.0}, {"time": fresh, "dkk": 1.0}]}, now)
+    assert [p["dkk"] for p in power["series"]] == [1.0]
 
 
 def test_updates_are_merged_near_home_marked():
@@ -393,9 +378,9 @@ def test_weather_times_become_real_instants():
     assert w["hourly"][0]["t"] == "2026-11-06T06:00:00Z" and w["text"] == "overskyet"
 
 
-def test_section_is_quiet_until_set_up(client):
+def test_the_overview_block_needs_no_setup(client):
     block = client.get("/api/overview").json()["blocks"]["dklive"]
-    assert block["configured"] is False
+    assert block["layers"] == ["alarms", "traffic", "lightning", "radar"] and block["power"] is None
 
 
 # ---- FamilyLog ---------------------------------------------------------------------
@@ -1380,91 +1365,6 @@ def test_disconnecting_removes_the_copy_and_keeps_the_log(client, monkeypatch):
     with db.connect() as con:
         assert con.execute("SELECT COUNT(*) FROM google_events").fetchone()[0] == 0
     assert _log(uid) == ["Mit møde"]
-
-
-# ---- DK live: the map on the overview ----------------------------------------------
-
-class _FakeDkLive:
-    def __init__(self, status=200, content=b"<html>kort</html>", kind="text/html"):
-        self.asked, self.response = [], httpx.Response(status, content=content, headers={"content-type": kind})
-
-    def __call__(self, url, timeout=None):
-        self.asked.append(url)
-        return self.response
-
-
-def _map(client, monkeypatch, **kwargs):
-    from app.sections.dklive import client as dk
-    fake = _FakeDkLive(**kwargs)
-    monkeypatch.setattr(dk.httpx, "get", fake)
-    assert client.put("/api/admin/setup", json={"dkliveUrl": "http://dklive:4200"}).status_code == 200
-    return fake
-
-
-def test_the_map_comes_through_the_dashboard(client, monkeypatch):
-    fake = _map(client, monkeypatch, content=b"{}", kind="application/json")
-    r = client.get("/api/s/dklive/map/api/forecast?lat=55.1&lon=9.2")
-    assert r.status_code == 200 and r.headers["content-type"].startswith("application/json")
-    assert fake.asked == ["http://dklive:4200/api/forecast?lat=55.1&lon=9.2"]
-
-
-def test_the_maps_own_files_come_through(client, monkeypatch):
-    fake = _map(client, monkeypatch, content=b"import x", kind="text/javascript")
-    assert client.get("/api/s/dklive/map/layers/flights.js").text == "import x"
-    client.get("/api/s/dklive/map/index.html?embed=1&hours=6&layers=alarms,traffic")
-    assert fake.asked[-1] == "http://dklive:4200/index.html?embed=1&hours=6&layers=alarms,traffic"
-
-
-@pytest.mark.parametrize("path", ["api/settings", "api/logs", "api/logs/forget-visitors", "api/whoami",
-                                  "api/stats/alarms"])
-def test_dk_lives_settings_stay_out_of_reach(client, monkeypatch, path):
-    fake = _map(client, monkeypatch)
-    assert client.get(f"/api/s/dklive/map/{path}").status_code == 403
-    assert not fake.asked
-
-
-def test_the_map_cannot_climb_out_of_dk_live():
-    from app.sections.dklive import client as dk
-    with pytest.raises(dk.NotOnTheMap):
-        dk.map_file("layers/../../secret", "")
-
-
-def test_the_map_only_reads(client, monkeypatch):
-    _map(client, monkeypatch)
-    assert client.post("/api/s/dklive/map/api/settings", json={}).status_code == 405
-
-
-def test_the_map_needs_the_login_and_the_section(client, family, monkeypatch):
-    from fastapi.testclient import TestClient
-
-    from app.main import app
-    _map(client, monkeypatch)
-    me = family.get("/api/auth/status").json()["user"]
-    client.patch(f"/api/admin/users/{me['id']}", json={"sections": [s for s in me["sections"] if s != "dklive"]})
-    assert family.get("/api/s/dklive/map/index.html").status_code == 403
-    assert TestClient(app).get("/api/s/dklive/map/index.html").status_code == 401
-
-
-def test_a_silent_dk_live_is_said_plainly(client, monkeypatch):
-    from app.sections.dklive import client as dk
-    _map(client, monkeypatch)
-
-    def fails(_url, timeout=None):
-        raise httpx.ConnectError("no")
-
-    monkeypatch.setattr(dk.httpx, "get", fails)
-    r = client.get("/api/s/dklive/map/index.html")
-    assert r.status_code == 502 and "ConnectError" in r.json()["detail"]
-
-
-def test_the_layers_set_in_admin_reach_the_map(client):
-    assert client.put("/api/admin/setup", json={"dkliveLayers": ["ships", "alarms"]}).status_code == 200
-    address = client.get("/api/overview").json()["blocks"]["dklive"]["map"]
-    assert address == "/api/s/dklive/map/index.html?embed=1&hours=6&layers=ships,alarms"
-
-
-def test_an_unknown_layer_is_refused(client):
-    assert client.put("/api/admin/setup", json={"dkliveLayers": ["ubåde"]}).status_code == 400
 
 
 # ---- Aktier: prices and the week ---------------------------------------------------

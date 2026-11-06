@@ -39,10 +39,9 @@ def _app_targets() -> list[tuple[str, str, int]]:
     """The apps the dashboard reads from, as far as they are set up."""
     s = settings.load()
     out = []
-    for name, key in (("DK live", "dkliveUrl"), ("FamilyLog", "familylogUrl")):
-        url = urlparse(s.get(key) or "")
-        if url.hostname:
-            out.append((name, url.hostname, url.port or (443 if url.scheme == "https" else 80)))
+    url = urlparse(s.get("familylogUrl") or "")
+    if url.hostname:
+        out.append(("FamilyLog", url.hostname, url.port or (443 if url.scheme == "https" else 80)))
     return out
 
 

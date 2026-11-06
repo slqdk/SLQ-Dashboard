@@ -46,7 +46,7 @@ hostname -I
 
 Åbn `http://<ip>:8090`, og opret administratoren. Alt andet sættes op under
 **Admin → Opsætning**: hjemme (sted og koordinater, bruges til vejret og til hvad
-der er tæt på), adressen til dk-live, Google og nyhedskilder.
+der er tæt på), kortets lag og nøgler, Google og nyhedskilder.
 
 ## 3. Nginx Proxy Manager
 

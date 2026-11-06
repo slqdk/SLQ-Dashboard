@@ -72,16 +72,16 @@ def test_secrets_never_reach_the_browser(client):
 
 
 def test_setup_refuses_bad_values(client):
-    assert client.put("/api/admin/setup", json={"dkliveUrl": "ftp://x"}).status_code == 400
+    assert client.put("/api/admin/setup", json={"familylogUrl": "ftp://x"}).status_code == 400
     assert client.put("/api/admin/setup", json={"unknown": 1}).status_code == 400
     assert client.put("/api/admin/setup", json={"homeLat": 200}).status_code == 400
 
 
 def test_a_pinned_value_cannot_be_saved(client, monkeypatch):
-    monkeypatch.setenv("APP_DKLIVE_URL", "http://1.2.3.4:4200")
-    r = client.put("/api/admin/setup", json={"dkliveUrl": "http://5.6.7.8"})
+    monkeypatch.setenv("APP_FAMILYLOG_URL", "http://1.2.3.4:8081")
+    r = client.put("/api/admin/setup", json={"familylogUrl": "http://5.6.7.8"})
     assert r.status_code == 400
-    assert "APP_DKLIVE_URL" in r.json()["detail"]
+    assert "APP_FAMILYLOG_URL" in r.json()["detail"]
 
 
 def test_overview_survives_a_broken_section(client, monkeypatch):

@@ -1,29 +1,33 @@
-"""Read dk-live's API and turn it into what the dashboard shows."""
+"""Turn what the live sources hold into what the dashboard shows. Everything here reads
+memory, so the overview answers at once."""
 from __future__ import annotations
 
 import math
 import re
 from datetime import datetime, timedelta, timezone
 
-import httpx
+from ...core import settings
+from . import (airports, alarms, autobahn, dmi, energy, flights, flow, forecast, niord, photos, police, ships, source,
+               traffic, trains, weather, webcams)
 
-from ...core import logs, settings
-
-TIMEOUT = 12.0
 NEAR_KM = 60.0
 FEED_SIZE = 40
 PRICE_HISTORY_HOURS = 30
 TRAFFIC_ITEMS = 6
 NEAR_HOURS = 12
+MAP_HOURS = 6               # what the map shows from sources with a time
 ROUTINE = re.compile(r"^(eftersyn|isl-forespørgsel)", re.I)
-
-_cache: dict = {}
-_prices: dict[str, float] = {}      # dk-live only sends what is ahead; the past is kept here
+SOURCES = {"flights": "Fly", "flights-routes": "Flyruter", "ships": "Skibe", "alarms": "112", "alarms-stations": "Brandstationer",
+           "alarms-places": "Stednavne", "traffic": "Trafik", "trains": "Tog", "autobahn": "Autobahn",
+           "autobahn-cameras": "Autobahns kameraer", "webcams": "Windy", "radar": "Regnradar", "lightning": "Lyn",
+           "wind": "Vind", "sealevel": "Vandstand", "navwarnings": "Navigationsadvarsler", "energy": "Elpriser",
+           "forecast": "Vejr", "police": "Politi", "airports": "Lufthavne"}
 
 
 def reset() -> None:
-    _cache.clear()
-    _prices.clear()
+    for module in (source, airports, alarms, autobahn, dmi, energy, flights, flow, forecast, niord, photos, police, ships,
+                   traffic, trains, weather, webcams):
+        module.reset()
 
 
 def _iso(dt: datetime) -> str:
@@ -42,36 +46,12 @@ def km_between(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     return 2 * r * math.asin(math.sqrt(a))
 
 
-def price_time(ms: float, base: str | None, tz) -> datetime:
-    """dk-live's energy.js reads Energinet's TimeDK as if it were UTC, so its
-    `time` is Danish wall-clock time wearing a UTC label: 1 hour late in winter
-    and 2 in summer. Read it as the wall-clock time it is. When dk-live sends
-    timeBase "utc" the value is a real instant and is used as it stands."""
-    dt = datetime.fromtimestamp(ms / 1000, timezone.utc)
-    if base == "utc":
-        return dt
-    return dt.replace(tzinfo=tz).astimezone(timezone.utc)
-
-
-def remember_prices(series: list[dict], now: datetime) -> list[dict]:
-    """Today's earlier prices stay on the band although dk-live has moved on."""
-    for p in series:
-        _prices[p["t"]] = p["dkk"]
+def build_power(data: dict, now: datetime) -> dict | None:
     cutoff = _iso(now - timedelta(hours=PRICE_HISTORY_HOURS))
-    for t in [t for t in _prices if t < cutoff]:
-        del _prices[t]
-    return [{"t": t, "dkk": _prices[t]} for t in sorted(_prices)]
-
-
-def build_power(data: dict, tz, now: datetime) -> dict | None:
-    prices = data.get("prices") or []
-    series = []
-    for p in prices:
-        if p.get("time") and p.get("dkk") is not None:
-            series.append({"t": _iso(price_time(p["time"], data.get("timeBase"), tz)), "dkk": p["dkk"]})
+    series = [{"t": _ms(p["time"]), "dkk": p["dkk"]} for p in data.get("prices") or [] if p.get("time") and p.get("dkk") is not None]
+    series = [p for p in series if p["t"] >= cutoff]
     if not series:
         return None
-    series = remember_prices(series, now)
     stamp = _iso(now)
     past = [p for p in series if p["t"] <= stamp]
     current = past[-1] if past else series[0]
@@ -81,7 +61,9 @@ def build_power(data: dict, tz, now: datetime) -> dict | None:
     mix = data.get("now") or {}
     return {"area": data.get("area") or "", "now": current["dkk"], "nowAt": current["t"],
             "low": low, "high": high, "series": series,
-            "wind": mix.get("wind"), "solar": mix.get("solar"), "co2": mix.get("co2")}
+            "wind": mix.get("wind"), "solar": mix.get("solar"), "co2": mix.get("co2"),
+            "plants": (mix.get("central") or 0) + (mix.get("local") or 0) if mix else None,
+            "exchange": mix.get("exchangeSum")}
 
 
 WEATHER_TEXT = [
@@ -166,103 +148,57 @@ def headline_updates(feed: list[dict], now: datetime) -> list[dict]:
     return close + [f for f in useful if f not in close]
 
 
-def _get(base: str, path: str, params: dict | None = None) -> dict:
-    r = httpx.get(base + path, params=params, timeout=TIMEOUT)
-    r.raise_for_status()
-    return r.json()
-
-
-def job() -> None:
-    s = settings.load()
-    base = (s.get("dkliveUrl") or "").rstrip("/")
-    if not base:
-        _cache.clear()
-        return
-    tz = settings.tz()
-    now = datetime.now(timezone.utc)
-    problems: list[str] = []
-
-    def read(path: str, params: dict | None = None) -> dict:
-        try:
-            return _get(base, path, params)
-        except (httpx.HTTPError, ValueError) as exc:
-            problems.append(f"{path}: {type(exc).__name__}")
-            return {}
-
-    energy = read("/api/energy")
-    forecast = read("/api/forecast", {"lat": s["homeLat"], "lon": s["homeLon"]})
-    odin, police, traffic = read("/api/odin"), read("/api/police"), read("/api/traffic")
-    power = build_power(energy, tz, now)
-    weather = build_weather(forecast, tz)
-    updates = build_updates(odin, police, traffic, (s["homeLat"], s["homeLon"]))
-    # What one failed read could not refresh stays from the last good round.
-    _cache.update({
-        "ok": not problems,
-        "error": "; ".join(problems[:3]),
-        "updated": _iso(now),
-        "power": power or _cache.get("power"),
-        "weather": weather or _cache.get("weather"),
-        "feed": updates["feed"] or _cache.get("feed", []),
-        "traffic": updates["traffic"],
-    })
-    if problems:
-        logs.record_problem("dklive", _cache["error"])
-
-
 def state() -> dict:
     s = settings.load()
-    return {"configured": bool(s.get("dkliveUrl")),
-            "link": s.get("dkliveLink") or s.get("dkliveUrl") or "",
-            "home": s.get("homeName") or "", **_cache}
+    now = datetime.now(timezone.utc)
+    updates = build_updates(alarms.get(), police.get(), traffic.get(), (s["homeLat"], s["homeLon"]))
+    problems = source.problems()
+    return {"home": s.get("homeName") or "", "layers": s.get("dkliveLayers") or [],
+            "ok": not problems, "error": "; ".join(problems[:3]), "updated": _iso(now),
+            "power": build_power(energy.get(), now), "weather": build_weather(forecast.home(), settings.tz()),
+            "feed": updates["feed"], "traffic": updates["traffic"]}
 
 
 def overview(_me: dict) -> dict:
     out = state()
-    out["feed"] = headline_updates(out.get("feed") or [], datetime.now(timezone.utc))[:6]
-    out["map"] = map_address(settings.load().get("dkliveLayers") or [])
+    out["feed"] = headline_updates(out["feed"], datetime.now(timezone.utc))[:6]
     return out
 
 
-# ---- dk-live's own map, through the dashboard ------------------------------------
+# ---- what the map reads ------------------------------------------------------------
 
-MAP_PATH = "/api/s/dklive/map"
-MAP_HOURS = 6
-# What the map reads. dk-live trusts its home network, which the dashboard is on, so
-# its settings and logs must not be reachable through here.
-MAP_FEEDS = ("flights", "ships", "odin", "traffic", "radar", "lightning", "trains", "autobahn", "webcams", "wind",
-             "sealevel", "navwarnings", "energy", "airports", "flow", "forecast", "config", "photo")
+def recent(items: list[dict], *fields: str, now_ms: int | None = None) -> list[dict]:
+    """Only what happened in the last six hours. Something with no time stays."""
+    cutoff = (now_ms or source.now_ms()) - MAP_HOURS * 3_600_000
+    return [item for item in items if (next((item[f] for f in fields if item.get(f)), None) or cutoff) >= cutoff]
 
 
-class NotOnTheMap(RuntimeError):
-    """A path outside what the map needs."""
+FEEDS = {
+    "flights": flights.get,
+    "ships": ships.get,
+    "alarms": lambda: {**alarms.get(), "alarms": recent(alarms.get()["alarms"], "time")},
+    "traffic": lambda: {**traffic.get(), "events": recent(traffic.get()["events"], "modified", "begin")},
+    "autobahn": lambda: {**autobahn.get(), "items": recent(autobahn.get()["items"], "start")},
+    "lightning": lambda: {**weather.lightning(), "strikes": recent(weather.lightning()["strikes"], "time")},
+    "navwarnings": lambda: {**niord.get(), "warnings": recent(niord.get()["warnings"], "from")},
+    "trains": trains.get,
+    "webcams": webcams.get,
+    "radar": weather.radar,
+    "wind": dmi.wind,
+    "sealevel": dmi.sea,
+    "energy": energy.get,
+    "airports": airports.get,
+}
 
 
-class MapUnavailable(RuntimeError):
-    """dk-live gave no answer; the text is shown to the person."""
-
-
-def map_address(layers: list[str]) -> str:
-    return f"{MAP_PATH}/index.html?embed=1&hours={MAP_HOURS}&layers={','.join(layers)}"
-
-
-def map_file(path: str, query: str) -> httpx.Response:
-    feed = path.removeprefix("api/").split("/")[0]
-    if ".." in path or (path.startswith("api/") and feed not in MAP_FEEDS):
-        raise NotOnTheMap(path)
-    base = (settings.load().get("dkliveUrl") or "").rstrip("/")
-    if not base:
-        raise MapUnavailable("Adressen til dk-live mangler.")
-    try:
-        return httpx.get(f"{base}/{path or 'index.html'}{'?' + query if query else ''}", timeout=TIMEOUT)
-    except httpx.HTTPError as exc:
-        raise MapUnavailable(f"dk-live svarer ikke ({type(exc).__name__}).") from None
+def map_feed(name: str) -> dict | None:
+    feed = FEEDS.get(name)
+    return feed() if feed else None
 
 
 def setup_status() -> dict:
-    if not settings.load().get("dkliveUrl"):
-        return {"ok": False, "text": "Adresse mangler."}
-    if not _cache:
+    states = source.state()
+    if not states:
         return {"ok": False, "text": "Venter på første hentning."}
-    return {"ok": bool(_cache.get("ok")), "text": _cache.get("error") or "Svarer."}
-
-
+    bad = [f"{SOURCES.get(name, name)}: {s['text']}" for name, s in states.items() if not s["ok"]]
+    return {"ok": not bad, "text": "; ".join(bad[:4]) or f"{len(states)} kilder svarer."}

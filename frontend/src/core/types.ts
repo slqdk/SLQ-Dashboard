@@ -59,6 +59,8 @@ export interface Power {
   wind: number | null
   solar: number | null
   co2: number | null
+  plants: number | null
+  exchange: number | null
 }
 
 export interface HourWeather {
@@ -91,13 +93,11 @@ export interface LiveUpdate {
 }
 
 export interface DkLive {
-  configured: boolean
-  link: string
   home: string
+  layers: string[]
   ok?: boolean
   error?: string
   updated?: string
-  map?: string
   power?: Power | null
   weather?: Weather | null
   feed?: LiveUpdate[]
