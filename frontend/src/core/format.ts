@@ -43,6 +43,12 @@ export function ago(iso: string, now = Date.now()): string {
   return `${Math.round(hours / 24)} d`
 }
 
+/** "lige nu" or "for 5 min siden", to follow a word like opdateret. */
+export function since(iso: string, now = Date.now()): string {
+  const text = ago(iso, now)
+  return text === 'lige nu' ? text : `for ${text} siden`
+}
+
 export function until(iso: string, now = Date.now()): string {
   const min = Math.round((new Date(iso).getTime() - now) / 60_000)
   if (min <= 0) return 'i gang'

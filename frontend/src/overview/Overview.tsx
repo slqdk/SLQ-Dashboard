@@ -1,4 +1,4 @@
-import { ago, clock, dayName, kr, longDate, monthName, one, until, whole } from '../core/format'
+import { ago, clock, dayName, kr, longDate, monthName, one, since, until, whole } from '../core/format'
 import { hrefOf } from '../core/routes'
 import { useNow, usePoll } from '../core/usePoll'
 import type { DkLive, LifeEvent, LiveUpdate, Overview as Data, User } from '../core/types'
@@ -80,11 +80,6 @@ function PowerSummary({ dk }: { dk: DkLive }) {
   )
 }
 
-function updatedText(iso: string, now: Date): string {
-  const text = ago(iso, now.getTime())
-  return text === 'lige nu' ? 'Opdateret lige nu' : `Opdateret for ${text} siden`
-}
-
 function LiveBlock({ dk, now }: { dk?: DkLive; now: Date }) {
   if (!dk) return null
   if (!dk.configured) return <p className="empty">Sæt adressen til dk-live under Admin → Opsætning.</p>
@@ -104,7 +99,7 @@ function LiveBlock({ dk, now }: { dk?: DkLive; now: Date }) {
       {dk.updated && (
         <p className="live-stamp">
           <span className={`dot dot-${dk.ok ? 'good' : 'slow'}`} aria-hidden="true" />
-          {dk.ok ? updatedText(dk.updated, now) : 'Viser seneste data, dk-live svarer ikke helt'}
+          {dk.ok ? `Opdateret ${since(dk.updated, now.getTime())}` : 'Viser seneste data, dk-live svarer ikke helt'}
         </p>
       )}
     </div>
@@ -244,7 +239,7 @@ export function Overview({ user, onAuthLost }: { user: User; onAuthLost: () => v
             {b.aktier.positions ? (
               <>
                 <p className="fl-spent">{b.aktier.positions}</p>
-                <p className="note">værdipapirer{b.aktier.importedAt ? `, importeret for ${ago(b.aktier.importedAt, now.getTime())} siden` : ''}</p>
+                <p className="note">værdipapirer{b.aktier.importedAt ? `, importeret ${since(b.aktier.importedAt, now.getTime())}` : ''}</p>
               </>
             ) : (
               <p className="empty">{b.aktier.mode === 'csv' ? 'Intet importeret endnu.' : 'Nordnet er ikke forbundet.'}</p>

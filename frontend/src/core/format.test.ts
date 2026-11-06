@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ago, dayKey, dayName, duration, kr, localDate, units, until } from './format'
+import { ago, dayKey, dayName, duration, kr, localDate, since, units, until } from './format'
 
 const now = new Date(2026, 10, 6, 7, 15) // Friday 6 November
 
@@ -29,6 +29,11 @@ describe('times', () => {
     expect(ago(new Date(t - 3 * 3_600_000).toISOString(), t)).toBe('3 t')
     expect(until(new Date(t + 90 * 60_000).toISOString(), t)).toBe('om 1 t 30 min')
     expect(until(new Date(t - 1000).toISOString(), t)).toBe('i gang')
+  })
+  it('reads after a word like opdateret', () => {
+    const t = now.getTime()
+    expect(since(new Date(t - 30_000).toISOString(), t)).toBe('lige nu')
+    expect(since(new Date(t - 5 * 60_000).toISOString(), t)).toBe('for 5 min siden')
   })
   it('says minutes as hours and minutes', () => {
     expect(duration(45)).toBe('45 min')
