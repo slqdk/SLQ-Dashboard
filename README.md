@@ -18,7 +18,7 @@ sin egen LXC på Proxmox. Lavet til pc'en; på telefonen virker det bare.
 | **Printere** | Status på printerne: fremskridt, tid tilbage, temperaturer. Kun læsning | Bambu Lab-printere direkte på netværket |
 | **Kameraer** | Billeder og live-video bag login. Familien får det kun, hvis du vælger det | Tapo C200 gennem go2rtc |
 | **Links** | Dine links i mapper | Egen database |
-| **Admin** | Familiens brugere og al opsætning | |
+| **Admin** | Familiens brugere, al opsætning, og loggen med status på hver kilde | |
 
 Øverst til højre står ping-indikatoren: **Her** er svartiden fra din browser til
 serveren, **Server** er svartiden fra serveren og ud. Klik for detaljer og

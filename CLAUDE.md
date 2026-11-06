@@ -48,7 +48,11 @@ Proxmox LXC. **Read `docs/PLAN.md` first: decisions, what is built, what is open
 - **`overview()` never calls an upstream.** It reads the database or a job's cache,
   so the page always answers at once.
 - **No secrets to the browser or the log.** Settings secrets go through
-  `settings.public()`; per-person tokens through `core/vault.py`.
+  `settings.public()`; per-person tokens through `core/vault.py`. Admin → Log shows the
+  log file in the browser, so `logs.clean` masks what looks like a key or a login.
+- **Energi Data Service is asked no more than its data changes.** It limits per dataset
+  and answers 429. The day-ahead prices come once a day, so `energy.price_job` asks only when
+  those in hand run out and keeps them over a restart; a 429's wait is kept.
 - **Nordnet rows are a person's own.** Nothing from them reaches a log or an error
   text, only the last four digits of a depot number are kept, and real exports stay
   out of the repo and its tests. Only ISINs go to Yahoo.

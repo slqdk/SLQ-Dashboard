@@ -10,6 +10,7 @@ and httpx puts the address in the text.
 from __future__ import annotations
 
 import functools
+import logging
 import os
 import time
 from datetime import datetime, timezone
@@ -18,6 +19,7 @@ from zoneinfo import ZoneInfo
 import httpx
 
 from ...core import logs, settings
+from ...meta import APP_ID
 
 WEST, SOUTH, EAST, NORTH = 7.5, 53.3, 13.0, 57.9
 CENTER_LAT = (SOUTH + NORTH) / 2
@@ -91,7 +93,11 @@ def why(exc: BaseException | str) -> str:
 
 
 def done(name: str, text: str) -> None:
-    _state[name] = {"ok": True, "text": text, "at": now_ms()}
+    """The first answer and the first after a failure go into the log, the others not."""
+    if not _state.get(name, {}).get("ok"):
+        logging.getLogger(APP_ID).info("dklive %s: %s", name, text)
+    at = now_ms()
+    _state[name] = {"ok": True, "text": text, "at": at, "lastOk": at}
 
 
 def failed(name: str, problem: BaseException | str) -> None:
@@ -102,7 +108,7 @@ def failed(name: str, problem: BaseException | str) -> None:
             logs.record_exception(problem, f"dklive {name}")    # a changed shape, or a bug
         else:
             logs.record_problem("dklive", f"{name}: {text}")
-    _state[name] = {"ok": False, "text": text, "at": now_ms()}
+    _state[name] = {"ok": False, "text": text, "at": now_ms(), "lastOk": _state.get(name, {}).get("lastOk")}
 
 
 def off(name: str) -> None:

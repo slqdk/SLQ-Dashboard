@@ -123,6 +123,8 @@ bash update.sh rollback   # tilbage til seneste backup, kode og data
 bash update.sh compose logs -f
 ```
 
+Admin → Log viser det samme i browseren, og hvordan hver kilde har det.
+
 Alt der er dit, ligger i volumet `/data`: `app.db`, `settings.json`, `secret.key`,
 `logmylife/` med billeder og filer, og logs. Egne indstillinger hører til i
 `deploy/container/docker-compose.override.yml`, som git ignorerer.

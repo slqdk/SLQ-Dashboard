@@ -438,10 +438,27 @@ await page.waitForSelector('.ping-panel')
 await shot('overview-ping')
 await page.click('h1')
 
+// ---- the log ------------------------------------------------------------------------
+await go('admin')
+await page.click('.segmented button:text-is("Log")')
+await page.waitForSelector('.sources li:has-text("Elpriser")')
+check((await page.textContent('.sources li:has-text("Elpriser")')).includes('priser for'), 'the log says where the power prices stand')
+await page.waitForSelector('.log li')
+check(true, 'the log file is on the page')
+await page.fill('.log-head input[type="search"]', 'noget der ikke findes')
+await page.waitForSelector('.log-page .empty')
+check(true, 'the log can be searched')
+await shot('log')
+
 // ---- themes -------------------------------------------------------------------------
 const shownTheme = () => page.evaluate(() => document.documentElement.dataset.theme)
-const landOfTheMap = (color) => page.waitForFunction(
-  (want) => window.slqMap?.getLayer?.('background') && window.slqMap.getPaintProperty('background', 'background-color') === want, color, { timeout: 15_000 })
+const landOfTheMap = (color) => page.waitForFunction((want) => {
+  try {
+    return window.slqMap.getPaintProperty('background', 'background-color') === want
+  } catch {
+    return false                    // the old map is gone, the new one not there yet
+  }
+}, color, { timeout: 15_000 })
 await go('')
 await page.selectOption('.nav-theme', 'win2k')
 check(await shownTheme() === 'win2k', 'a theme changes the page at once')

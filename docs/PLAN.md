@@ -107,6 +107,20 @@ sets every layer of the style, since a light map shows any dark one left over, a
 layer's label turns to plain ink there. Choosing a theme builds the map anew. Markers keep
 their colours and their dark outline, which reads on both.
 
+## The log, and why the prices went away (0.8.1)
+Admin → Log shows every source with its status and when it last worked, and the end of the
+log file, newest first, with search. It reads what is already there, so it asks no one.
+`logs.clean` masks keys and logins going into the file and again coming out of it.
+
+The power prices were gone after the update to 0.8.0 while the source answered fine from
+here. What fits: the job asked DayAheadPrices every two minutes, a dataset that changes
+once a day, dk-live asked the same from the same address, and Energi Data Service has
+limits per dataset since 2026, answering 429 and possibly going on doing so while one keeps
+asking. Prices in memory hid the failures until a restart emptied it. This is the likely
+cause, not a seen one: the log will show the answer, and if it is 403 the address is
+blocked and only asking them helps. Either way the job now asks only when the prices run
+out, keeps them over a restart, and leaves the snapshot alone while no layer shows it.
+
 ## Not verified
 
 - The Docker image, `proxmox/create-lxc.sh` and the go2rtc image have never run: no

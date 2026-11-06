@@ -130,7 +130,7 @@ def job() -> None:
                 currencies.add(listed)
                 found += 1
         except (httpx.HTTPError, ValueError, KeyError, IndexError, TypeError) as exc:
-            logs.record_problem("stock prices", f"{isin}: {type(exc).__name__}")
+            logs.record_problem("stock prices", type(exc).__name__)     # never the ISIN: it says what is held
     for currency in currencies - {BASE, ""}:
         try:
             _remember(_fx_symbol(currency), closes(_fx_symbol(currency))[1])

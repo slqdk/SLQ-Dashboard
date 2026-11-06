@@ -73,9 +73,10 @@ def test_a_failing_source_goes_into_the_log_once(client, answering):
     from app.sections.dklive import energy
     answering({"energidataservice": httpx.ConnectError("nej")})
     logs.clear()
-    energy.job()
-    energy.job()
-    assert sum("energy" in e["message"] for e in logs.recent()) == 1
+    energy.price_job()
+    energy.reset()
+    energy.price_job()
+    assert sum("prices" in e["message"] for e in logs.recent()) == 1
 
 
 def test_a_layer_that_is_off_is_not_fetched(client, answering):
@@ -414,15 +415,113 @@ def test_niord_tries_the_next_host(client, answering):
 
 def test_power_uses_utc_and_the_area_from_admin(client, answering):
     from app.sections.dklive import energy
-    client.put("/api/admin/setup", json={"priceArea": "DK2"})
+    client.put("/api/admin/setup", json={"priceArea": "DK2", "dkliveLayers": ["energy"]})
     fake = answering({"PowerSystemRightNow": {"records": [{"Minutes1UTC": "2026-11-06T10:00:00", "OffshoreWindPower": 100.0, "onshorewindpower": 50.0, "SolarPower": 5.0,
                                                            "ProductionGe100MW": 300.0, "ProductionLt100MW": 200.0, "CO2Emission": 90.0, "Exchange_Sum": -10.0, "Exchange_DK1_DE": -410.5}]},
                       "DayAheadPrices": {"records": [{"TimeUTC": "2026-11-06T10:15:00", "TimeDK": "2026-11-06T11:15:00", "DayAheadPriceDKK": 1234.5678}]}})
-    energy.job()
+    energy.now_job()
+    energy.price_job()
     data = energy.get()
     assert data["area"] == "DK2" and data["now"]["wind"] == 150.0 and data["now"]["exchanges"] == {"Exchange_DK1_DE": -410.5}
     assert data["prices"] == [{"time": source_ms("2026-11-06T10:15:00"), "dkk": 1.235}]
     assert '"DK2"' in fake.asked[1][1]["filter"]
+
+
+def day_ahead(*hours: int) -> dict:
+    """Prices at these hours from now, the way the service writes them."""
+    now = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0, tzinfo=None)
+    return {"records": [{"TimeUTC": (now + timedelta(hours=h)).isoformat(), "DayAheadPriceDKK": 1000.0} for h in hours]}
+
+
+def test_prices_are_asked_for_only_when_they_run_out(client, answering):
+    from app.sections.dklive import energy
+    fake = answering({"DayAheadPrices": day_ahead(-1, 0, 30)})
+    energy.price_job()
+    energy.price_job()
+    assert len(fake.asked) == 1
+
+
+def test_tomorrows_prices_are_waited_for_without_hammering(client, answering):
+    from app.sections.dklive import energy
+    fake = answering({"DayAheadPrices": day_ahead(-1, 0, 8)})
+    energy.price_job()
+    energy.price_job()
+    assert len(fake.asked) == 1
+    energy._next_ask = 0                    # half an hour later
+    energy.price_job()
+    assert len(fake.asked) == 2
+
+
+def test_prices_survive_a_restart(client, answering):
+    from app.sections.dklive import energy
+    answering({"DayAheadPrices": day_ahead(-1, 0, 30)})
+    energy.price_job()
+    energy.reset()
+    fake = answering({"DayAheadPrices": 429})
+    energy.price_job()
+    assert fake.asked == [] and len(energy.get()["prices"]) == 3
+
+
+def test_a_limit_is_waited_out_and_says_so(client, answering):
+    from app.sections.dklive import energy, source
+    fake = answering({"DayAheadPrices": 429})
+    energy.price_job()
+    assert source.state()["prices"]["text"] == f"HTTP 429, prøver igen om {energy.AFTER_FAILURE_MIN} min"
+    energy.price_job()
+    assert len(fake.asked) == 1
+
+
+def test_a_limit_with_a_long_wait_is_respected():
+    from app.sections.dklive import energy
+    answer = httpx.Response(429, text="Rate limit is exceeded. Try again in 3600 seconds.", request=httpx.Request("GET", "http://x"))
+    assert energy.stated_wait(httpx.HTTPStatusError("x", request=answer.request, response=answer)) == 61
+
+
+def test_the_snapshot_failing_leaves_the_prices_alone(client, answering):
+    from app.sections.dklive import energy, source
+    client.put("/api/admin/setup", json={"dkliveLayers": ["energy"]})
+    answering({"PowerSystemRightNow": httpx.ConnectError("nej"), "DayAheadPrices": day_ahead(-1, 0, 30)})
+    energy.now_job()
+    energy.price_job()
+    assert source.state()["energy"]["ok"] is False and len(energy.get()["prices"]) == 3
+
+
+def test_the_snapshot_is_not_fetched_while_nothing_shows_it(client, answering):
+    from app.sections.dklive import energy
+    client.put("/api/admin/setup", json={"dkliveLayers": ["flights"]})
+    fake = answering({"PowerSystemRightNow": {"records": []}})
+    energy.now_job()
+    assert fake.asked == []
+
+
+def test_a_new_price_area_is_fetched_at_once(client, answering):
+    from app.sections.dklive import energy
+    fake = answering({"DayAheadPrices": day_ahead(-1, 0, 30)})
+    energy.price_job()
+    client.put("/api/admin/setup", json={"priceArea": "DK2"})
+    energy.price_job()
+    assert '"DK2"' in fake.asked[-1][1]["filter"] and len(fake.asked) == 2
+
+
+def test_an_old_price_is_not_shown_as_todays():
+    from app.sections.dklive import client as live
+    now = datetime(2026, 11, 6, 12, 0, tzinfo=timezone.utc)
+    old = {"prices": [{"time": NOW - 3 * 3_600_000, "dkk": 2.0}]}
+    assert live.build_power(old, now) is None
+    fresh = {"prices": [{"time": NOW - 10 * 60_000, "dkk": 2.0}]}
+    assert live.build_power(fresh, now)["now"] == 2.0
+
+
+def test_a_source_that_comes_back_says_so_in_the_status(client, answering):
+    from app.sections.dklive import client as live, energy
+    answering({"DayAheadPrices": 503})
+    energy.price_job()
+    assert [s for s in live.sources() if s["name"] == "Elpriser"][0]["ok"] is False
+    energy.reset()
+    answering({"DayAheadPrices": day_ahead(-1, 0, 30)})
+    energy.price_job()
+    row = [s for s in live.sources() if s["name"] == "Elpriser"][0]
+    assert row["ok"] is True and row["lastOk"] == row["at"]
 
 
 def test_police_updates_become_cases():

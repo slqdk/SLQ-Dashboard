@@ -151,6 +151,8 @@ export default function LiveMap({ layers, free }: { layers: string[]; free: RefO
     place()
 
     map.once('style.load', () => applyTheme(map))       // before anything is drawn in the style's own black
+    // A map given up while it loads, as when the theme changes, cancels its tiles.
+    map.on('error', ({ error }) => { if (error?.name !== 'AbortError') console.error(error) })
     map.on('load', () => {
       const on = new Set(wanted.split(','))
       for (const [id, add] of LAYERS) if (on.has(id)) add(live)

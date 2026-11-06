@@ -131,6 +131,9 @@ def auth_logout(request: Request, response: Response):
     return {"ok": True}
 
 
+LOG_LINES = 500
+
+
 class ThemeBody(BaseModel):
     theme: str
 
@@ -325,9 +328,25 @@ def admin_save_setup(body: dict, request: Request):
     return _setup_view(request)
 
 
+def _sources() -> list[dict]:
+    """What each section last heard from where it gets its data."""
+    out: list[dict] = []
+    for s in SECTIONS:
+        try:
+            if s.sources:
+                out += s.sources()
+            elif s.setup:
+                line = s.setup()
+                out.append({"name": s.title, "ok": line["ok"], "text": line["text"], "at": None, "lastOk": None})
+        except Exception as exc:
+            logs.record_exception(exc, f"sources: {s.id}")
+            out.append({"name": s.title, "ok": False, "text": "Kunne ikke læses.", "at": None, "lastOk": None})
+    return out
+
+
 @app.get("/api/admin/log")
 def admin_log():
-    return {"recent": logs.recent(50), "tail": logs.tail(200)}
+    return {"sources": _sources(), "tail": logs.tail(LOG_LINES)}
 
 
 # ---------- the sections ----------

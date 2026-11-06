@@ -13,6 +13,7 @@ from . import (airports, alarms, autobahn, dmi, energy, flights, flow, forecast,
 NEAR_KM = 60.0
 FEED_SIZE = 40
 PRICE_HISTORY_HOURS = 30
+PRICE_STALE_MINUTES = 60        # a price this old says nothing about now
 TRAFFIC_ITEMS = 6
 NEAR_HOURS = 12
 MAP_HOURS = 6               # what the map shows from sources with a time
@@ -20,7 +21,8 @@ ROUTINE = re.compile(r"^(eftersyn|isl-forespørgsel)", re.I)
 SOURCES = {"flights": "Fly", "flights-routes": "Flyruter", "ships": "Skibe", "alarms": "112", "alarms-stations": "Brandstationer",
            "alarms-places": "Stednavne", "traffic": "Trafik", "trains": "Tog", "autobahn": "Autobahn",
            "autobahn-cameras": "Autobahns kameraer", "webcams": "Windy", "flow": "Trafiktæthed", "radar": "Regnradar", "lightning": "Lyn",
-           "wind": "Vind", "sealevel": "Vandstand", "navwarnings": "Navigationsadvarsler", "energy": "Elpriser",
+           "wind": "Vind", "sealevel": "Vandstand", "navwarnings": "Navigationsadvarsler", "prices": "Elpriser",
+           "energy": "Strøm lige nu",
            "forecast": "Vejr", "police": "Politi", "airports": "Lufthavne"}
 
 
@@ -55,6 +57,8 @@ def build_power(data: dict, now: datetime) -> dict | None:
     stamp = _iso(now)
     past = [p for p in series if p["t"] <= stamp]
     current = past[-1] if past else series[0]
+    if current["t"] < _iso(now - timedelta(minutes=PRICE_STALE_MINUTES)):
+        return None
     ahead = [p for p in series if p["t"] >= current["t"]]
     low = min(ahead, key=lambda p: p["dkk"])
     high = max(ahead, key=lambda p: p["dkk"])
@@ -194,6 +198,11 @@ FEEDS = {
 def map_feed(name: str) -> dict | None:
     feed = FEEDS.get(name)
     return feed() if feed else None
+
+
+def sources() -> list[dict]:
+    return [{"name": SOURCES.get(name, name), "ok": s["ok"], "text": s["text"], "at": s.get("at"), "lastOk": s.get("lastOk")}
+            for name, s in source.state().items()]
 
 
 def setup_status() -> dict:

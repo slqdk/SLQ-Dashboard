@@ -14,6 +14,8 @@ From FamilyLog's Section, with what a dashboard adds:
 * jobs         - [(seconds, fn)]: background work; each runs in its own
                  daemon thread, first time right after start
 * setup        - fn() -> {"ok": bool, "text": str}: one line for Admin → Opsætning
+* sources      - optional: fn() -> [{"name", "ok", "text", "at", "lastOk"}], for a section
+                 with several, on Admin → Log. The others have their one line there
 * reset        - optional: clears in-memory state (tests)
 * on_user_deleted - optional: called with the user id after an account is
                  deleted (rows go by ON DELETE CASCADE)
@@ -40,5 +42,6 @@ class Section:
     overview: Callable[[dict], dict] | None = None
     jobs: list[tuple[float, Callable[[], None]]] = field(default_factory=list)
     setup: Callable[[], dict] | None = None
+    sources: Callable[[], list[dict]] | None = None
     reset: Callable[[], None] | None = None
     on_user_deleted: Callable[[int], None] | None = None

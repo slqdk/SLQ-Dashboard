@@ -167,3 +167,41 @@ def test_every_theme_in_the_stylesheet_is_known():
     picker = (root / "core" / "theme.ts").read_text(encoding="utf-8")
     assert set(re.findall(r"\[data-theme='([\w-]+)'\] \{", css)) == set(THEMES) - {"dark"}
     assert re.findall(r"^  \['([\w-]+)', '", picker, re.M) == list(THEMES)
+
+
+# ---- the log -----------------------------------------------------------------------
+
+def test_admin_sees_the_sources_and_the_log(client):
+    from app.sections.dklive import source
+    source.failed("prices", "HTTP 429, prøver igen om 10 min")
+    source.done("flights", "12 fly")
+    body = client.get("/api/admin/log").json()
+    rows = {row["name"]: row for row in body["sources"]}
+    assert rows["Elpriser"]["ok"] is False and "429" in rows["Elpriser"]["text"]
+    assert rows["Fly"]["ok"] is True and rows["Fly"]["at"]
+    assert rows["Formel 1"]["text"]                 # a section with one line has that line
+    assert isinstance(body["tail"], str)
+
+
+def test_family_sees_no_log(family):
+    assert family.get("/api/admin/log").status_code == 403
+
+
+def test_secrets_are_masked_in_a_log_text():
+    from app.core.logs import clean
+    assert clean("GET https://a.dk/x?key=abc123&tags=1") == "GET https://a.dk/x?key=…&tags=1"
+    assert clean("access_token=abc client_secret=def") == "access_token=… client_secret=…"
+    assert clean("rtsp://kamera:hemmelig@10.0.0.2/stream1") == "rtsp://…@10.0.0.2/stream1"
+    assert clean("Authorization: Bearer abc.def") == "Authorization: Bearer …"
+    assert clean("dklive prices: HTTP 429") == "dklive prices: HTTP 429"
+
+
+def test_the_log_file_and_the_ring_hold_no_key(client):
+    import logging
+    from app.core import logs
+    logs.setup()
+    logs.record_problem("test", "https://a.dk/?apikey=hemmelig")
+    for handler in logging.getLogger().handlers:
+        handler.flush()
+    assert "hemmelig" not in str(logs.recent()) and "hemmelig" not in logs.tail(50)
+    assert "hemmelig" not in client.get("/api/admin/log").text

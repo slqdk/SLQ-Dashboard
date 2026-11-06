@@ -12,12 +12,15 @@ traceback appeared only in a terminal, so the tab just said "Loading..."
 forever and the cause was invisible from inside the app.
 
 Nothing here logs request bodies, prompts or passwords: entries are the
-exception, where it happened, and the traceback.
+exception, where it happened, and the traceback. Admin → Log shows the file in the
+browser, so what looks like a key or a login in a text is masked on the way in and
+again on the way out, for lines written before this was here.
 """
 from __future__ import annotations
 
 import logging
 import logging.handlers
+import re
 import threading
 import traceback
 from collections import deque
@@ -33,6 +36,12 @@ LOG_FILE = LOG_DIR / f"{APP_ID}.log"
 MAX_BYTES = 2_000_000       # per file
 BACKUPS = 5                 # ~10 MB total, then the oldest is dropped
 RING_SIZE = 200             # recent entries kept for the UI
+
+_SECRETS = (
+    (re.compile(r"(?i)\b(\w*(?:key|token|secret|password|passwd|pwd|code))=[^&\s\"'<>]+"), r"\1=…"),
+    (re.compile(r"(?i)\b([a-z][a-z0-9+.-]*://)[^/\s:@]+:[^/\s@]+@"), r"\1…@"),
+    (re.compile(r"(?i)\bbearer\s+[\w.~+/=-]+"), "Bearer …"),
+)
 
 _ring: deque[dict] = deque(maxlen=RING_SIZE)
 _lock = threading.Lock()
@@ -66,6 +75,17 @@ def _is_noise(record: logging.LogRecord) -> bool:
     return any(marker in text for marker in _NOISE)
 
 
+def clean(text: str) -> str:
+    for pattern, mask in _SECRETS:
+        text = pattern.sub(mask, text)
+    return text
+
+
+class _CleanFormatter(logging.Formatter):
+    def format(self, record: logging.LogRecord) -> str:
+        return clean(super().format(record))
+
+
 class _RingHandler(logging.Handler):
     """Keeps recent warnings and errors in memory for the Diagnostics tab."""
 
@@ -80,9 +100,9 @@ class _RingHandler(logging.Handler):
                                                tz=timezone.utc).isoformat(),
                 "level": record.levelname,
                 "logger": record.name,
-                "message": record.getMessage()[:2000],
+                "message": clean(record.getMessage())[:2000],
                 "where": f"{record.module}.{record.funcName}:{record.lineno}",
-                "traceback": ("".join(traceback.format_exception(*record.exc_info))[-4000:]
+                "traceback": (clean("".join(traceback.format_exception(*record.exc_info)))[-4000:]
                               if record.exc_info else None),
             }
         except Exception:
@@ -101,7 +121,7 @@ def setup() -> None:
     file_handler = logging.handlers.RotatingFileHandler(
         LOG_FILE, maxBytes=MAX_BYTES, backupCount=BACKUPS, encoding="utf-8")
     file_handler.setLevel(logging.INFO)
-    file_handler.setFormatter(logging.Formatter(
+    file_handler.setFormatter(_CleanFormatter(
         "%(asctime)s %(levelname)-7s %(name)s %(module)s:%(lineno)d  %(message)s"))
 
     root = logging.getLogger()
@@ -152,7 +172,7 @@ def tail(lines: int = 200) -> str:
             text = fh.read().decode("utf-8", errors="replace")
     except OSError:
         return ""
-    return "\n".join(text.splitlines()[-lines:])
+    return clean("\n".join(text.splitlines()[-lines:]))
 
 
 def record_problem(where: str, message: str) -> None:

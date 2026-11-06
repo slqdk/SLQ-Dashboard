@@ -27,11 +27,12 @@ SECTION = Section(
         (300.0, weather.radar_job), (120.0, weather.lightning_job),
         (600.0, dmi.wind_job), (600.0, dmi.sea_job),
         (900.0, niord.job),
-        (120.0, energy.job),
+        (120.0, energy.now_job), (300.0, energy.price_job),
         (600.0, forecast.job),
         (300.0, police.job),
         (600.0, airports.job),
     ],
     setup=client.setup_status,
+    sources=client.sources,
     reset=client.reset,
 )

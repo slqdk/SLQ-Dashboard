@@ -3,6 +3,7 @@ import { api } from '../core/api'
 import { usePoll } from '../core/usePoll'
 import type { User } from '../core/types'
 import { Dialog, SectionHead } from '../sections/common'
+import { LogPage } from './LogPage'
 
 interface AdminUser extends User {
   online: boolean
@@ -23,16 +24,19 @@ interface Setup {
 }
 
 export function Admin({ me, onAuthLost }: { me: User; onAuthLost: () => void }) {
-  const [tab, setTab] = useState<'users' | 'setup'>('users')
+  const [tab, setTab] = useState<'users' | 'setup' | 'log'>('users')
   return (
     <main className="page">
-      <SectionHead title="Admin" text="Familiens brugere, og al opsætning af forbindelser.">
+      <SectionHead title="Admin" text="Familiens brugere, al opsætning af forbindelser og loggen.">
         <div className="segmented" role="group" aria-label="Admin">
           <button className={tab === 'users' ? 'on' : ''} onClick={() => setTab('users')}>Brugere</button>
           <button className={tab === 'setup' ? 'on' : ''} onClick={() => setTab('setup')}>Opsætning</button>
+          <button className={tab === 'log' ? 'on' : ''} onClick={() => setTab('log')}>Log</button>
         </div>
       </SectionHead>
-      {tab === 'users' ? <Users me={me} onAuthLost={onAuthLost} /> : <SetupPage onAuthLost={onAuthLost} />}
+      {tab === 'users' && <Users me={me} onAuthLost={onAuthLost} />}
+      {tab === 'setup' && <SetupPage onAuthLost={onAuthLost} />}
+      {tab === 'log' && <LogPage onAuthLost={onAuthLost} />}
     </main>
   )
 }
