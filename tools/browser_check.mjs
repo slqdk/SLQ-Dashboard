@@ -274,6 +274,8 @@ check(Object.values(fits).every(Boolean), `Denmark lies in the free part ${JSON.
 const features = async (source) => page.evaluate((s) => window.slqMap.getSource(s)?.serialize().data?.features?.length ?? 0, source)
 const LAYER_SOURCES = ['flights', 'military', 'ships', 'alarms', 'traffic', 'autobahn', 'trains', 'webcams', 'airports', 'wind', 'sealevel', 'navwarn', 'lightning', 'ic-lines']
 await page.waitForFunction((list) => list.every((s) => (window.slqMap.getSource(s)?._data?.features?.length ?? 0) > 0), LAYER_SOURCES, { timeout: 45_000 }).catch(() => {})
+const tile = await page.evaluate(async () => (await fetch('/api/s/dklive/map/flow/6/33/19.pbf')).status)
+check(tile === 200, 'a traffic tile comes through the server')
 for (const source of LAYER_SOURCES) check(await features(source) > 0, `the map has ${source}`)
 const traffic = await page.evaluate(() => window.slqMap.getSource('traffic').serialize().data.features.map((f) => f.properties.title))
 check(traffic.length === 2 && !traffic.some((t) => t.includes('gammelt')), 'only what happened in the last six hours')
@@ -399,6 +401,7 @@ check(await page.locator('.block h2:has-text("Aktier")').count() === 0, 'nor on 
 check(await page.locator('.nav nav a:has-text("Kameraer")').count() === 0, 'family has no Kameraer')
 check(await page.locator('.block h2:has-text("Kameraer")').count() === 0, 'nor on the overview')
 check(await page.locator('.block h2:has-text("Printere")').count() === 1, 'but family has Printere')
+check(await page.locator('.block h2:has-text("Links")').count() === 0, 'and no Links panel without links')
 const denied = await page.evaluate(async () => (await fetch('/api/s/aktier/state')).status)
 check(denied === 403, 'the API refuses a section the account does not have')
 const cameraDenied = await page.evaluate(async () => (await fetch('/api/s/cameras/1/frame.jpg')).status)

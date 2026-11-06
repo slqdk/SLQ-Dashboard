@@ -19,7 +19,7 @@ MAP_HOURS = 6               # what the map shows from sources with a time
 ROUTINE = re.compile(r"^(eftersyn|isl-forespørgsel)", re.I)
 SOURCES = {"flights": "Fly", "flights-routes": "Flyruter", "ships": "Skibe", "alarms": "112", "alarms-stations": "Brandstationer",
            "alarms-places": "Stednavne", "traffic": "Trafik", "trains": "Tog", "autobahn": "Autobahn",
-           "autobahn-cameras": "Autobahns kameraer", "webcams": "Windy", "radar": "Regnradar", "lightning": "Lyn",
+           "autobahn-cameras": "Autobahns kameraer", "webcams": "Windy", "flow": "Trafiktæthed", "radar": "Regnradar", "lightning": "Lyn",
            "wind": "Vind", "sealevel": "Vandstand", "navwarnings": "Navigationsadvarsler", "energy": "Elpriser",
            "forecast": "Vejr", "police": "Politi", "airports": "Lufthavne"}
 

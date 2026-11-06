@@ -166,15 +166,13 @@ export function Overview({ user, onAuthLost }: { user: User; onAuthLost: () => v
               </Block>
             )}
 
-            {b.links && (
+            {!!b.links?.pinned.length && (
               <Block id="links" title="Links">
-                {b.links.pinned.length ? (
-                  <ul className="pinned">
-                    {b.links.pinned.map((l) => (
-                      <li key={l.id}><a href={l.url} target="_blank" rel="noreferrer noopener">{l.title}</a></li>
-                    ))}
-                  </ul>
-                ) : <p className="empty">{b.links.total ? 'Fastgør et link, så står det her.' : 'Ingen links endnu.'}</p>}
+                <ul className="pinned">
+                  {b.links.pinned.map((l) => (
+                    <li key={l.id}><a href={l.url} target="_blank" rel="noreferrer noopener">{l.title}</a></li>
+                  ))}
+                </ul>
               </Block>
             )}
           </div>

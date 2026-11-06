@@ -20,7 +20,7 @@ export function addFlow(live: Live): void {
     type: 'line',
     source: 'flow',
     'source-layer': 'Traffic flow',
-    filter: ['in', ['get', 'road_category'], ['literal', ['motorway', 'trunk']]],
+    filter: ['any', ['!', ['has', 'road_category']], ['in', ['get', 'road_category'], ['literal', ['motorway', 'trunk']]]],
     layout: { 'line-cap': 'round', 'line-join': 'round' },
     paint: {
       'line-color': ['step', ['coalesce', ['get', 'traffic_level'], 1], '#c0392b', 0.35, '#ff5c4d', 0.6, '#ffb300', 0.85, '#4ade80'],

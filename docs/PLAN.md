@@ -83,7 +83,8 @@ section registry, `update.sh`), same as SLQ Hub and FamilyLog.
   settings sees other shades than here.
 - The four sources with a key have not run against the real thing: AISStream, Rejseplanen,
   TomTom and Windy. Their shapes are dk-live's, run against stand-ins, and ships over a real
-  local websocket. Overpass does not answer from where this was built, so the fire stations
+  local websocket. In 0.6.1 Trafiktæthed drew nothing with a real key, reason unknown: 0.6.2
+  sends the tags as dk-live does and tells Admin why a tile failed. Overpass does not answer from where this was built, so the fire stations
   ran against a stand-in; 112 alarms were placed through Nominatim meanwhile, which works.
 - Real Bambu printers. Field names and the 5-minute rule are from OpenBambuAPI. Firmware
   since early 2025 restricts third-party control; monitoring is reported to work, and

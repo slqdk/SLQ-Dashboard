@@ -554,7 +554,8 @@ def test_a_tile_passes_through_and_the_key_stays_here(client, answering):
     fake = answering({"api.tomtom.com": "tile"})
     r = client.get("/api/s/dklive/map/flow/6/33/19.pbf")
     assert r.content == b"tile" and r.headers["content-type"] == "application/x-protobuf"
-    assert fake.asked[0][1]["key"] == "tomtom-noegle-1"
+    assert fake.asked[0][0].endswith("/flow/relative/6/33/19.pbf?key=tomtom-noegle-1"
+                                     "&tags=[traffic_level,traffic_road_coverage,road_category,road_subcategory]")
     client.get("/api/s/dklive/map/flow/6/33/19.pbf")
     assert len(fake.asked) == 1                     # kept a minute
 
@@ -565,6 +566,16 @@ def test_a_tile_that_fails_does_not_show_the_address(client, answering):
     answering({"api.tomtom.com": httpx.HTTPStatusError("x?key=tomtom-noegle-1", request=request, response=httpx.Response(403, request=request))})
     r = client.get("/api/s/dklive/map/flow/6/33/19.pbf")
     assert r.status_code == 502 and "tomtom-noegle" not in r.text and "HTTP 403" in r.text
+    from app.sections.dklive import client as dk
+    assert dk.setup_status() == {"ok": False, "text": "Trafiktæthed: HTTP 403"}     # Admin says why the roads are grey
+
+
+def test_a_tile_without_road_types_is_told_in_admin(client, answering):
+    from app.sections.dklive import client as dk
+    client.put("/api/admin/setup", json={"tomtomKey": "tomtom-noegle-1"})
+    answering({"api.tomtom.com": "Traffic flow traffic_level"})
+    assert client.get("/api/s/dklive/map/flow/6/33/19.pbf").status_code == 200
+    assert dk.setup_status()["text"] == "Trafiktæthed: ingen vejtyper i svaret"
 
 
 def test_no_key_no_tile(client):
