@@ -406,7 +406,12 @@ function SetupPage({ onAuthLost }: { onAuthLost: () => void }) {
           <summary>Sådan laves klienten i Google Cloud</summary>
           <ol>
             <li>Opret et projekt i Google Cloud Console, og slå Google Calendar API til.</li>
-            <li>Opsæt OAuth consent screen som External, tilføj scopet calendar.readonly, og sæt den til In production. I Testing udløber forbindelsen efter 7 dage.</li>
+            <li>Sæt Google Auth Platform op som External, og tilføj scopet calendar.readonly under Data access.</li>
+            <li>Tilføj jeres domæne under Authorised domains på Branding, og udfyld forside, privatlivspolitik og vilkår. Uden dem kan appen ikke publiceres. Brug denne adresse til de to sidste, og lad logoet stå tomt, for et logo kræver, at Google godkender appen:</li>
+          </ol>
+          <code className="copy">{data.googleRedirectUri.replace('/api/google/callback', '/privacy.html')}</code>
+          <ol start={4}>
+            <li>Tryk Publish app under Audience. I Testing udløber forbindelsen efter 7 dage.</li>
             <li>Opret en OAuth client af typen Web application med denne Authorized redirect URI:</li>
           </ol>
           <code className="copy">{data.googleRedirectUri}</code>

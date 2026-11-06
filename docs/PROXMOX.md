@@ -63,9 +63,12 @@ kun bruges hjemme og over WireGuard, så læg en Access List på i NPM.
 ## 4. Google
 
 Under **Admin → Opsætning → Google Kalender** står trinene og den redirect-adresse,
-Google skal have. Husk at sætte OAuth consent screen til *In production*: i
-*Testing* udløber forbindelsen efter 7 dage. Hver person forbinder bagefter sin
-egen konto under **Kalender**.
+Google skal have. Google kræver https og et domæne, så sæt adressen fra afsnit 3 op
+først. Appen skal publiceres (*Publish app*): i *Testing* udløber forbindelsen efter
+7 dage. Det kræver, at Branding har forside, privatlivspolitik og vilkår udfyldt.
+Brug `https://dashboard.slq.dk/privacy.html` til de to sidste; siden følger med
+dashboardet og kræver ikke login. Lad logoet stå tomt, for et logo kræver, at Google
+godkender appen. Hver person forbinder bagefter sin egen konto under **Kalender**.
 
 ## 5. FamilyLog
 

@@ -49,11 +49,17 @@ const noOverflow = async (name) => {
 await page.goto(BASE)
 await page.waitForSelector('text=Første gang')
 check(true, 'first run asks for the administrator')
+const privacy = await page.request.get(`${BASE}/privacy.html`)
+check(privacy.status() === 200 && (await privacy.text()).includes('calendar.readonly'), 'the privacy page needs no login')
+const icon = await page.request.get(`${BASE}/favicon.svg`)
+check(icon.status() === 200 && icon.headers()['content-type'].includes('svg'), 'the tab icon is served')
 await page.fill('input[autocomplete="username"]', 'soren')
 await page.fill('input[type="password"]', 'korrekt-hest-1')
 await page.click('button:has-text("Opret administrator")')
 await page.waitForSelector('.hero h1')
 check(true, 'administrator created, overview shown')
+await page.waitForFunction(() => document.querySelector('.mark img')?.naturalWidth > 0)
+check(true, 'the logo is in the top bar')
 
 // ---- Admin: feeds, a family member ------------------------------------------------
 await go('admin')

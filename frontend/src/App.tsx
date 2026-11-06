@@ -52,6 +52,7 @@ function Login({ needsSetup, onDone }: { needsSetup: boolean; onDone: (u: User) 
         <label>Adgangskode<input type="password" required autoComplete={needsSetup ? 'new-password' : 'current-password'} value={password} onChange={(e) => setPassword(e.target.value)} /></label>
         {problem && <p className="problem">{problem}</p>}
         <button type="submit" className="primary">{needsSetup ? 'Opret administrator' : 'Log ind'}</button>
+        <a className="note" href="/privacy.html">Privatliv og vilkår</a>
       </form>
     </main>
   )
@@ -92,7 +93,7 @@ export function App() {
   return (
     <div className="shell">
       <header className="nav">
-        <a className="mark" href="#/" aria-label="Overblik">SLQ</a>
+        <a className="mark" href="#/" aria-label="Overblik"><img src="/favicon.svg" alt="" width="32" height="32" /></a>
         <nav aria-label="Sektioner">
           <a href="#/" aria-current={path === '' ? 'page' : undefined}>Overblik</a>
           {SECTIONS.filter((s) => user.sections.includes(s.id)).map((s) => (

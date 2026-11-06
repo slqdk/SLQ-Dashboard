@@ -73,7 +73,10 @@ section registry, `update.sh`), same as SLQ Hub and FamilyLog.
   Docker daemon and no Proxmox where this was built. `tools/container.py` is
   FamilyLog's, renamed. Søren made CT 109 himself (2 cores, 2 GB, about 60 GB), and
   `docs/PROXMOX.md` has the steps for a container that already exists.
-- Real Google OAuth. The whole flow ran against `tools/mock_upstreams.py` only.
+- Real Google OAuth. The whole flow ran against `tools/mock_upstreams.py` only. Google's
+  app is External and must be published, which needs home, privacy and terms links on
+  Branding (`frontend/public/privacy.html`, public, serves for both) and no logo: a
+  logo would mean verification.
 - Real Bambu printers. Field names and the 5-minute rule are from OpenBambuAPI. Firmware
   since early 2025 restricts third-party control; monitoring is reported to work, and
   some setups may need LAN mode or Developer Mode.

@@ -336,6 +336,14 @@ def all_sections():
 
 
 # ---------- the frontend ----------
+def root_file(rest: str, base: Path = STATIC_DIR) -> Path | None:
+    """A file at the top of the build, like the tab icon. Never one below or above it."""
+    if not rest or "/" in rest or "\\" in rest or rest == "..":
+        return None
+    file = base / rest
+    return file if file.is_file() else None
+
+
 if STATIC_DIR.is_dir():
     app.mount("/assets", StaticFiles(directory=STATIC_DIR / "assets"), name="assets")
 
@@ -343,7 +351,7 @@ if STATIC_DIR.is_dir():
     def spa(rest: str):
         if rest.startswith("api/"):
             raise HTTPException(404, "Findes ikke.")
-        return FileResponse(STATIC_DIR / "index.html")
+        return FileResponse(root_file(rest) or STATIC_DIR / "index.html")
 else:
     @app.get("/", include_in_schema=False)
     def _no_frontend():

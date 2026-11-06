@@ -129,3 +129,17 @@ def test_vault_round_trip_and_not_in_clear(fresh_db):
     sealed = vault.seal("min-hemmelige-token")
     assert "min-hemmelige-token" not in sealed
     assert vault.unseal(sealed) == "min-hemmelige-token"
+
+
+def test_only_files_at_the_top_of_the_build_are_served(tmp_path):
+    from app.main import root_file
+    (tmp_path / "favicon.svg").write_text("<svg/>")
+    (tmp_path / "assets").mkdir()
+    (tmp_path / "assets" / "x.js").write_text("x")
+    assert root_file("favicon.svg", tmp_path) == tmp_path / "favicon.svg"
+    assert root_file("assets", tmp_path) is None
+    assert root_file("assets/x.js", tmp_path) is None
+    assert root_file("../secret.key", tmp_path) is None
+    assert root_file("..", tmp_path) is None
+    assert root_file("", tmp_path) is None
+    assert root_file("findes-ikke", tmp_path) is None
