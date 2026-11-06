@@ -286,6 +286,30 @@ check(true, 'the map zooms')
 await page.click('.map-home')
 await page.waitForFunction((z) => Math.abs(window.slqMap.getZoom() - z) < 0.01, zoomBefore, { timeout: 5000 })
 check(true, 'and goes back to the whole of Denmark')
+await page.mouse.wheel(0, 800)
+await page.waitForTimeout(400)
+check(Math.abs(await page.evaluate(() => window.slqMap.getZoom()) - zoomBefore) < 0.01, 'the whole of Denmark is as far out as it goes')
+const homeCentre = await page.evaluate(() => window.slqMap.getCenter().toArray())
+await page.mouse.move(middle.x + middle.width / 2, middle.y + middle.height / 2)
+await page.mouse.down()
+await page.mouse.move(middle.x + 80, middle.y + 40, { steps: 8 })
+await page.mouse.up()
+await page.waitForTimeout(600)
+const afterDrag = await page.evaluate(() => window.slqMap.getCenter().toArray())
+check(Math.abs(afterDrag[0] - homeCentre[0]) < 0.01 && Math.abs(afterDrag[1] - homeCentre[1]) < 0.01, 'and cannot be dragged away from there')
+const edges = await page.evaluate(() => {
+  const m = window.slqMap
+  m.jumpTo({ center: [13.4, 52.5], zoom: 9 })               // Berlin
+  const b = document.querySelector('.map-background').getBoundingClientRect(), f = document.querySelector('.map-free').getBoundingClientRect()
+  const south = m.unproject([f.left - b.left + f.width / 2, f.bottom - b.top]).lat
+  m.jumpTo({ center: [2, 50], zoom: 9 })                    // the Channel
+  const west = m.unproject([f.left - b.left, f.top - b.top + f.height / 2]).lng
+  return { south, west }
+})
+check(edges.south >= 53.29, `not further south than Hamburg (${edges.south.toFixed(2)})`)
+check(edges.west >= 7.49, `nor further west than the North Sea coast (${edges.west.toFixed(2)})`)
+await page.click('.map-home')
+await page.waitForTimeout(300)
 // Every popup, through the same click a person makes.
 const openPopup = async (layer, source) => {
   await page.evaluate(() => document.querySelector('.maplibregl-popup-close-button')?.click())
@@ -296,12 +320,14 @@ const openPopup = async (layer, source) => {
     window.popupAt = center
     m.jumpTo({ center, zoom: 9 })
   }, source)
-  await page.waitForTimeout(500)
-  const point = await page.evaluate(() => {
+  await page.waitForTimeout(1300)                         // aircraft move: click where they are now
+  const point = await page.evaluate((id) => {
+    const m = window.slqMap
     const b = document.querySelector('.map-background').getBoundingClientRect()
-    const c = window.slqMap.project(window.popupAt)
+    const rendered = m.queryRenderedFeatures({ layers: [id] }).find((f) => f.geometry.type === 'Point')
+    const c = m.project(rendered ? rendered.geometry.coordinates : window.popupAt)
     return [b.left + c.x, b.top + c.y]
-  })
+  }, layer)
   await page.mouse.click(point[0], point[1])
   await page.waitForSelector('.popup', { timeout: 3000 }).catch(() => {})
   await page.waitForTimeout(350)

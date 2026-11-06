@@ -10,6 +10,7 @@ import type { CalendarBlock, CalendarEvent, DkLive, F1Block, HourWeather, PriceP
 const GUTTER = 104
 const RIGHT = 12
 const AXIS = 16
+const HOUR_LABEL = 16, DAY_LABEL = 58, NOW_LABEL = 11       // how wide they are, the last one from its middle
 const LANES = 3
 const LANE = 15
 const ROWS = { calendar: 47, price: 30, temp: 26, rain: 14 }
@@ -83,6 +84,7 @@ export function DayBand({ now, dk, calendar, f1 }: Props) {
   const time = (px: number) => from + ((px - GUTTER) / plotW) * (to - from)
   const nowT = now.getTime()
   const at = cursor ?? nowT
+  const clearOfNow = (left: number, width: number) => left > x(nowT) + NOW_LABEL || left + width < x(nowT) - NOW_LABEL
 
   const prices: PricePoint[] = dk?.power?.series ?? []
   const hourly: HourWeather[] = dk?.weather?.hourly ?? []
@@ -188,9 +190,11 @@ export function DayBand({ now, dk, calendar, f1 }: Props) {
         {ticks.map((tick) => (
           <g key={tick.t}>
             <line x1={x(tick.t)} x2={x(tick.t)} y1={AXIS} y2={height - 2} className={tick.midnight ? 'band-grid strong' : 'band-grid'} />
-            <text x={x(tick.t) + 3} y={12} className={tick.midnight ? 'band-tick strong' : 'band-tick'}>
-              {tick.midnight ? cap(shortDay(new Date(tick.t))) : String(new Date(tick.t).getHours()).padStart(2, '0')}
-            </text>
+            {clearOfNow(x(tick.t) + 3, tick.midnight ? DAY_LABEL : HOUR_LABEL) && (
+              <text x={x(tick.t) + 3} y={12} className={tick.midnight ? 'band-tick strong' : 'band-tick'}>
+                {tick.midnight ? cap(shortDay(new Date(tick.t))) : String(new Date(tick.t).getHours()).padStart(2, '0')}
+              </text>
+            )}
           </g>
         ))}
 

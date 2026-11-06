@@ -18,7 +18,7 @@
   --rain: #4790dc;
   --f1: #de5046;
   --cal: #c6d3da;
-  --glass: rgba(15, 28, 38, .8);
+  --glass: rgba(15, 28, 38, .92);
 
   --good: #35b37e;
   --slow: #d9a441;
@@ -149,8 +149,8 @@ label.check input { width: 16px; }
 /* The map is the page: everything else lies on it, and what is free of panels is map. */
 .overview { position: relative; height: calc(100vh - 51px); min-height: 620px; overflow: hidden; background: var(--screen); }
 .overview .map-background { position: absolute; inset: 0; }
-.overlay { position: absolute; inset: 0; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 10px; padding: 10px 12px; pointer-events: none; }
-.hero-date, .hero-clock, .band, .block { background: var(--glass); backdrop-filter: blur(6px); border-radius: 6px; pointer-events: auto; }
+.overlay { position: absolute; inset: 0; z-index: 1; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 10px; padding: 10px 12px; pointer-events: none; }
+.hero-date, .hero-clock, .band, .block { background: var(--glass); border-radius: 6px; pointer-events: auto; }
 .hero { display: grid; grid-template-columns: minmax(240px, 300px) minmax(0, 1fr) auto; align-items: stretch; gap: 10px; min-width: 0; }
 .hero-date { min-width: 0; padding: 7px 12px; overflow: hidden; }
 .hero h1 { font: 700 30px/1.05 var(--cond); letter-spacing: -.005em; }

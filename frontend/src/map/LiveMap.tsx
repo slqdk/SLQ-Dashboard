@@ -20,12 +20,13 @@ import { addTraffic } from './layers/traffic'
 import { addTrains } from './layers/trains'
 import { addWebcams } from './layers/webcams'
 import { addWind } from './layers/wind'
+import { AREA, limitCenter } from './limit'
 import { Live } from './live'
 import { applyTheme } from './theme'
 
 const STYLE = 'https://tiles.openfreemap.org/styles/dark'      // free, no key
-const AREA: [[number, number], [number, number]] = [[7.5, 53.3], [13.0, 57.9]]
 const FIT_PADDING = 14
+const MOST_PIXELS = 1.25    // the map fills the window, and a screen at 200 % would draw four times the pixels
 
 // Order matters: what comes first lies underneath.
 const LAYERS: [string, (live: Live) => void][] = [
@@ -87,6 +88,7 @@ export default function LiveMap({ layers, free }: { layers: string[]; free: RefO
         fitBoundsOptions: { padding: FIT_PADDING },
         minZoom: 4,
         maxZoom: 17,
+        pixelRatio: Math.min(window.devicePixelRatio, MOST_PIXELS),
         fadeDuration: 0,            // no label cross-fades, fewer redraws
         refreshExpiredTiles: false,
         renderWorldCopies: false,
@@ -100,6 +102,16 @@ export default function LiveMap({ layers, free }: { layers: string[]; free: RefO
     map.touchZoomRotate.disableRotation()
     Object.assign(window, { slqMap: map })       // for the browser check and the console
 
+    // This one method decides where the map may be, for dragging, zooming and popups alike.
+    const { transform } = map
+    const allowed = transform.getConstrained.bind(transform)
+    transform.getConstrained = (lngLat, zoom) => {
+      const result = allowed(lngLat, zoom)
+      const { left, right, top, bottom } = transform.padding
+      const center = limitCenter(result.center, result.zoom, transform.width - left - right, transform.height - top - bottom)
+      return { ...result, center: new maplibregl.LngLat(center.lng, center.lat) }
+    }
+
     const freeArea = () => {
       const hole = free.current?.getBoundingClientRect()
       return hole && hole.width > 0 && hole.height > 0 ? hole : container.getBoundingClientRect()
@@ -107,9 +119,15 @@ export default function LiveMap({ layers, free }: { layers: string[]; free: RefO
     const live = new Live(map, freeArea)
     let moved = false
 
+    // The whole area in the free part is as far out as the map goes.
+    const fit = () => {
+      const camera = map.cameraForBounds(AREA, { padding: FIT_PADDING })
+      if (camera?.zoom != null) map.setMinZoom(camera.zoom)
+      if (camera && !moved) map.jumpTo(camera)
+    }
     const home = () => {
       moved = false
-      map.fitBounds(AREA, { padding: FIT_PADDING, animate: false })
+      fit()
     }
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-right')
     map.addControl(new HomeControl(home), 'bottom-right')
@@ -125,7 +143,7 @@ export default function LiveMap({ layers, free }: { layers: string[]; free: RefO
       map.setPadding(padding)
       if (controls) Object.assign(controls.style, { top: `${padding.top}px`, right: `${padding.right}px`, bottom: `${padding.bottom}px`, left: `${padding.left}px` })
       map.resize()
-      if (!moved) map.fitBounds(AREA, { padding: FIT_PADDING, animate: false })
+      fit()
     }
     const watcher = new ResizeObserver(place)
     watcher.observe(container)

@@ -9,6 +9,8 @@
 .maplibregl-ctrl-attrib a { color: var(--mute); }
 .maplibregl-ctrl-attrib-button { filter: invert(1); }
 
+/* Above the panels: the map cannot always move a popup clear of them. */
+.maplibregl-popup { z-index: 2; }
 .maplibregl-popup-content { max-height: 66vh; overflow-y: auto; padding: 10px 14px 12px; background: var(--panel); border-radius: 6px; box-shadow: 0 2px 14px rgb(0 0 0 / .5); color: var(--paper); font: 400 14px/1.35 var(--text); scrollbar-width: thin; }
 .maplibregl-popup-anchor-bottom .maplibregl-popup-tip, .maplibregl-popup-anchor-bottom-left .maplibregl-popup-tip, .maplibregl-popup-anchor-bottom-right .maplibregl-popup-tip { border-top-color: var(--panel); }
 .maplibregl-popup-anchor-top .maplibregl-popup-tip, .maplibregl-popup-anchor-top-left .maplibregl-popup-tip, .maplibregl-popup-anchor-top-right .maplibregl-popup-tip { border-bottom-color: var(--panel); }

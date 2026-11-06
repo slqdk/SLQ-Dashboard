@@ -6,7 +6,6 @@ import { esc, rows, type Row } from '../text'
 import type { Aircraft } from '../types'
 
 const POLL_MS = 10_000
-const STEP_MS = 1000
 const MOST_AHEAD_S = 90             // an aircraft quiet for this long stops moving
 const KNOT = 0.514444
 const METRES_PER_DEGREE = 111_320
@@ -22,6 +21,10 @@ function ahead(a: Aircraft, now: number): [number, number] {
   }
   return [lon, lat]
 }
+
+/** Every step redraws the map. An airliner crosses a pixel in two seconds at country zoom,
+ *  so far out it need not move every second. */
+const stepMs = (zoom: number) => (zoom < 8 ? 4000 : zoom < 10 ? 2000 : 1000)
 
 function details(a: Aircraft): string {
   const r = a.route
@@ -78,8 +81,10 @@ export function addFlights(live: Live, military: boolean): void {
     },
   })
 
+  let drawn = 0
   const draw = () => {
     const now = Date.now()
+    drawn = now
     live.setData(id, {
       type: 'FeatureCollection',
       features: aircraft.map((a) => {
@@ -102,7 +107,10 @@ export function addFlights(live: Live, military: boolean): void {
   live.feed<{ aircraft: Aircraft[] }>('flights', POLL_MS, (data) => {
     aircraft = data.aircraft.filter((a) => a.military === military)
     live.aircraft = [...live.aircraft.filter((a) => a.military !== military), ...aircraft]
-    draw()
+    if (!map.isMoving()) draw()
   })
-  live.every(STEP_MS, () => { if (!document.hidden && aircraft.length) draw() })
+  live.every(1000, () => {
+    // Not while the map is dragged: it has enough to do.
+    if (!document.hidden && aircraft.length && !map.isMoving() && Date.now() - drawn >= stepMs(map.getZoom())) draw()
+  })
 }

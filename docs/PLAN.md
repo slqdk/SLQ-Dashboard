@@ -8,7 +8,7 @@ Last updated 2026-11-06. Read this before changing anything.
 |---|---|
 | Shape | An overview page with info from all sections, then a page per section |
 | Overview, from 2026-11-06 | The map of Denmark is the background and can be zoomed, and everything else lies on top of it. Date to the far left, clock to the far right, Dagsbåndet between them, and that top bar low. News, stocks and F1 fixed to the bottom. No Kalender or DK live blocks: the band carries the calendar, the map carries DK live |
-| The map | "Modificeret til den her app": built into the dashboard, not dk-live in a frame, with the API keys entered again in Admin. Only things from the last 6 hours, with a toggle for each layer under Admin → Opsætning → DK live og kortet |
+| The map | "Modificeret til den her app": built into the dashboard, not dk-live in a frame, with the API keys entered again in Admin. Only things from the last 6 hours, with a toggle for each layer under Admin → Opsætning → DK live og kortet. Only Denmark and Germany down to Hamburg: no further out and no dragging across Europe |
 | Aktier | A weekly graph of what he holds |
 | Target | Desktop PCs. Phones only have to work |
 | Platform | A new system of its own, in its own Proxmox container |
@@ -112,6 +112,20 @@ The panels lie on top, so the map is told what they leave free (`.map-free`): `s
 keeps Denmark, the buttons, the zoom and the popups in that part, and it refits until
 someone moves the map. `DK` goes back to the whole map. On a phone the map is a block of
 its own above the panels.
+
+How far it goes is in `map/limit.ts`. `maxBounds` will not do: it keeps the whole canvas
+inside the bounds, and the canvas reaches far under the panels. So `LiveMap` wraps
+`transform.getConstrained` and limits the free part instead, and the zoom that fits the
+area in it is the minimum zoom. That method is not public API: the browser check fails if
+an update of MapLibre changes it. MapLibre 5 and later have an option for this. 4.7.1 is
+kept for now.
+
+Weight, as dragging felt heavy in 0.6.0: the panels had `backdrop-filter`, which redraws a
+blur of everything behind each panel on every frame of a moving map, so it is gone. Pixels
+are capped at 1.25, aircraft are not redrawn while the map moves and only every 4 seconds
+at country zoom, and the pointer looks once per move, not once per layer. It could not be
+measured on a real graphics card where this was built: the software renderer here spends
+its time compositing and hardly moved.
 
 Time limits, in `client.recent`: alarms and lightning by their time, traffic by when it
 last changed, Autobahn and navigation warnings by their start. Things with a position right

@@ -60,7 +60,10 @@ export class Live {
   private timers: number[] = []
   private feeds = new Map<string, ((data: never) => void)[]>()
 
-  constructor(readonly map: MapLibre, readonly freeArea: () => DOMRect) {}
+  constructor(readonly map: MapLibre, readonly freeArea: () => DOMRect) {
+    // One look at what is under the pointer, not one for each layer.
+    map.on('mousemove', (e) => { map.getCanvas().style.cursor = this.onFeature(e.point) ? 'pointer' : '' })
+  }
 
   /** Poll a feed; a second reader of the same feed shares the first one's timer. */
   feed<T>(name: string, ms: number, onData: (data: T) => void): void {
@@ -102,8 +105,6 @@ export class Live {
   onClick(layer: string, handler: (e: MapLayerMouseEvent) => void): void {
     this.clickable.push(layer)
     this.map.on('click', layer, handler)
-    this.map.on('mouseenter', layer, () => { this.map.getCanvas().style.cursor = 'pointer' })
-    this.map.on('mouseleave', layer, () => { this.map.getCanvas().style.cursor = '' })
   }
 
   /** Whether a click hit something of ours rather than the map itself. */

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { metres, model, secondLabel } from './aircraft'
+import { limitCenter } from './limit'
 import { flag, kind, typeName } from './shipInfo'
 import { cap, compass, esc, link, rows, signed, webAddress } from './text'
 import type { Aircraft } from './types'
@@ -32,6 +33,36 @@ describe('text for popups', () => {
     expect(compass(359)).toBe('N')
     expect(signed(104.4)).toBe('+104')
     expect(signed(-3)).toBe('−3')
+  })
+})
+
+describe('how far the map goes', () => {
+  const home = { lng: 10.25, lat: 55.68 }
+  const FREE = [1000, 500] as const
+
+  it('stays put when the free part is bigger than the limit', () => {
+    const at = limitCenter({ lng: 2, lat: 48 }, 5, ...FREE)
+    expect(at.lng).toBeCloseTo(home.lng, 1)
+    expect(at.lat).toBeCloseTo(home.lat, 1)
+  })
+
+  it('keeps the free part north of Hamburg when zoomed in', () => {
+    const berlin = limitCenter({ lng: 13.4, lat: 52.5 }, 9, ...FREE)
+    expect(berlin.lat).toBeGreaterThan(53.3)
+    expect(berlin.lat).toBeLessThan(54)
+  })
+
+  it('reaches Skagen and Bornholm, and no further', () => {
+    expect(limitCenter({ lng: 10.6, lat: 57.7 }, 11, ...FREE)).toEqual(expect.objectContaining({ lat: expect.closeTo(57.7, 5) }))
+    expect(limitCenter({ lng: 14.9, lat: 55.1 }, 11, ...FREE).lng).toBeCloseTo(14.9, 5)
+    expect(limitCenter({ lng: 20, lat: 55.1 }, 11, ...FREE).lng).toBeLessThan(15.4)
+    expect(limitCenter({ lng: 10, lat: 70 }, 11, ...FREE).lat).toBeLessThan(57.9)
+  })
+
+  it('leaves a place inside the limit alone', () => {
+    const odense = limitCenter({ lng: 10.39, lat: 55.4 }, 10, ...FREE)
+    expect(odense.lng).toBeCloseTo(10.39, 5)
+    expect(odense.lat).toBeCloseTo(55.4, 5)
   })
 })
 
