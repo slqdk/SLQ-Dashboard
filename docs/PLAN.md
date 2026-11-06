@@ -52,7 +52,7 @@ section registry, `update.sh`), same as SLQ Hub and FamilyLog.
 | FamilyLog | Works, run against a real FamilyLog on its `read-keys` branch. Month's spending, search, Dagbog and FamilyMap into LogMyLife |
 | Printere | Built. One MQTT connection per printer, read only. Run against `tools/mock_printer.py`, never a real printer |
 | Kameraer | Built. Pictures every 5 seconds, live video in H.264 through the login, go2rtc behind it. Run in Chrome against real go2rtc and an RTSP test source, never a real C200 |
-| Aktier | Placeholder. See Nordnet below |
+| Aktier | Works from Nordnet's CSV export, run on a real one: holdings, average cost, dividends and results per year. No market prices yet. See Nordnet below |
 
 ### How Printere and Kameraer work
 - **Printere:** TLS on 8883, user `bblp`, the LAN access code as password. Models
@@ -102,22 +102,29 @@ The export needs no subscription and works now. The API has needed a paid Strava
 subscription since June 2026. If he has one: `activity:read_all`, and entries must stay
 that person's own (Strava's Section 2.3) and never go to any AI (5.3).
 
-### Nordnet (needs Søren)
-Nordnet's official API says "currently not onboarding new customers". A key also
-gives full trading access, with no read-only mode. Options:
-1. If he already has API access (Nordnet: Min side → Indstillinger → Min profil →
-   Sikkerhed → API-nøgle): use it, GET only, key kept on the server.
-2. Otherwise: import a CSV export for the holdings, and fetch prices from a public
-   source. Nothing fragile, but holdings are only as fresh as the last import.
-3. Unofficial web session (the route nordpy and nordnet-mcp take, with MitID or QR
-   login): real-time holdings, but it depends on unofficial behaviour and needs a
-   person to log in again. Not recommended.
+### Nordnet: prices (needs a decision)
+The API stays closed: Nordnet's docs say it is not onboarding new customers, its FAQ
+offers a waiting list and lists a price from 1,290 SEK a month, and Søren has no key.
+A key also gives full trading access, with no read-only mode. So the way in is the
+"transactions and notes" export, which each person uploads on the Aktier page.
+
+What the real file taught, and `aktier/nordnet.py` and `store.py` rely on: UTF-16 with a
+BOM, tabs, decimal commas, ISO dates. `Antal` has no sign. `Totalt antal` is 0 on
+UDBYTTE and UDBYTTESKAT rows, so those must not move a position. `Beløb` is mostly DKK,
+while `Indkøbsværdi` and `Resultat` are in the security's own currency, EUR and NOK
+included. Fractions are rounded, so totals are compared with a tolerance of 0.001.
+The cost is `Indkøbsværdi`, which excludes fees on most purchases, so it should match
+Nordnet's own average price, not what left the account.
+
+Holdings are as fresh as the last import, and market value needs a separate price
+source. Unofficial web-session routes (nordpy, nordnet-mcp, with MitID or QR login) give
+real-time holdings but need a person to log in again. Not recommended.
 
 ### Next, roughly in order
 1. Finish the deploy on CT 109, then the real Google connect
 2. Merge the two branches above and set the FamilyLog keys
 3. Add the real printers and cameras in Admin, and fix what they turn up
-4. Nordnet, when the way in is chosen
+4. A price source for Aktier, so holdings get a market value
 5. Photos on LogMyLife entries (FamilyLog's `_process`: resized, EXIF stripped)
 6. More SLQ DL facts, above all the 90s story and guests
 7. Bookmark import for Links

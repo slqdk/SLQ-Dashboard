@@ -65,3 +65,5 @@ const number = (digits: number) =>
 export const kr = (v: number) => number(2).format(v)
 export const one = (v: number) => number(1).format(v)
 export const whole = (v: number) => number(0).format(v)
+/** A number of shares or fund units, which can be a fraction. */
+export const units = (v: number) => new Intl.NumberFormat(da, { maximumFractionDigits: 4 }).format(v)

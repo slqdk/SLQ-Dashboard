@@ -3,7 +3,7 @@ import { api } from '../core/api'
 import { fullDate, localDate, whole } from '../core/format'
 import { usePoll } from '../core/usePoll'
 import type { LifeEvent } from '../core/types'
-import { Dialog, SectionHead } from './common'
+import { Dialog, FileImport, SectionHead } from './common'
 
 const API = '/api/s/logmylife'
 const SOURCE_TEXT: Record<string, string> = {
@@ -110,51 +110,17 @@ export function LogMyLife({ onAuthLost }: { onAuthLost: () => void }) {
       {editing && (
         <EventForm event={editing} categories={meta.data?.categories ?? []} onClose={() => setEditing(null)} onSaved={saved} />
       )}
-      {importing && <StravaImport onClose={() => setImporting(false)} onDone={() => { void list.reload(); void meta.reload() }} />}
+      {importing && (
+        <FileImport title="Importér fra Strava" url={`${API}/import/strava`} label="activities.csv" accept=".csv,text/csv"
+          onClose={() => setImporting(false)} onDone={() => { void list.reload(); void meta.reload() }}>
+          <ol className="steps">
+            <li>Sæt sproget på Strava til English.</li>
+            <li>Gå til Settings → My Account → Download your account, og bestil dine data.</li>
+            <li>Pak zip-filen fra mailen ud, og vælg activities.csv her.</li>
+          </ol>
+        </FileImport>
+      )}
     </main>
-  )
-}
-
-function StravaImport({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
-  const [problem, setProblem] = useState('')
-  const [result, setResult] = useState('')
-  const [busy, setBusy] = useState(false)
-
-  const send = async (file: File | undefined) => {
-    if (!file) return
-    setBusy(true)
-    setProblem('')
-    try {
-      const res = await fetch(`${API}/import/strava`, {
-        method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'text/csv' }, body: file,
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(typeof data.detail === 'string' ? data.detail : 'Importen lykkedes ikke.')
-      setResult(`${data.added} nye, ${data.updated} opdaterede, ${data.same} havde du allerede.${data.skipped ? ` ${data.skipped} rækker kunne ikke læses.` : ''}`)
-      onDone()
-    } catch (exc) {
-      setProblem(exc instanceof Error ? exc.message : 'Importen lykkedes ikke.')
-    }
-    setBusy(false)
-  }
-
-  return (
-    <Dialog title="Importér fra Strava" onClose={onClose}>
-      <ol className="steps">
-        <li>Sæt sproget på Strava til English.</li>
-        <li>Gå til Settings → My Account → Download your account, og bestil dine data.</li>
-        <li>Pak zip-filen fra mailen ud, og vælg activities.csv her.</li>
-      </ol>
-      <label>activities.csv
-        <input type="file" accept=".csv,text/csv" disabled={busy} onChange={(e) => void send(e.target.files?.[0])} />
-      </label>
-      {busy && <p className="note">Importerer.</p>}
-      {result && <p className="lead">{result}</p>}
-      {problem && <p className="problem">{problem}</p>}
-      <div className="dialog-actions">
-        <button onClick={onClose}>Luk</button>
-      </div>
-    </Dialog>
   )
 }
 

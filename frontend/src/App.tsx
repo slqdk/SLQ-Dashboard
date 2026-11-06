@@ -7,13 +7,14 @@ import { readRoute, SECTIONS } from './core/routes'
 import type { User } from './core/types'
 import { useNow } from './core/usePoll'
 import { Overview } from './overview/Overview'
+import { Aktier } from './sections/Aktier'
 import { Cameras } from './sections/Cameras'
 import { DkLive } from './sections/DkLive'
 import { LateNight } from './sections/LateNight'
 import { Links } from './sections/Links'
 import { LogMyLife } from './sections/LogMyLife'
 import { Printers } from './sections/Printers'
-import { Aktier, Calendar, F1, FamilyLog, News, NoAccess } from './sections/Simple'
+import { Calendar, F1, FamilyLog, News, NoAccess } from './sections/Simple'
 
 function useRoute() {
   const [path, setPath] = useState(() => readRoute().path)
@@ -112,7 +113,7 @@ export function App() {
       {allowed && section?.id === 'dklive' && <DkLive onAuthLost={lost} />}
       {allowed && section?.id === 'news' && <News onAuthLost={lost} />}
       {allowed && section?.id === 'logmylife' && <LogMyLife onAuthLost={lost} />}
-      {allowed && section?.id === 'aktier' && <Aktier user={user} />}
+      {allowed && section?.id === 'aktier' && <Aktier onAuthLost={lost} />}
       {allowed && section?.id === 'familylog' && <FamilyLog user={user} onAuthLost={lost} />}
       {allowed && section?.id === 'f1' && <F1 onAuthLost={lost} />}
       {allowed && section?.id === 'latenight' && <LateNight user={user} onAuthLost={lost} />}

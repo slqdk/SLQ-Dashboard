@@ -11,7 +11,7 @@ sin egen LXC på Proxmox. Lavet til pc'en; på telefonen virker det bare.
 | **DK live** | Elpriser, trafik og opdateringer, plus link til kortet | Din dk-live-container |
 | **Nyheder** | Overskrifter og korte tekster uden reklamer | RSS, hentet af serveren (DR og TV 2 som standard) |
 | **LogMyLife** | Din egen tidslinje, der husker alt | Dine indlæg, Google, Dagbog, FamilyMap, Strava-eksport |
-| **Aktier** | Nordnet | Ikke forbundet endnu, se `docs/PLAN.md` |
+| **Aktier** | Din beholdning med snitkurs, udbytte og resultat pr. år, ikke dagens kurser | CSV-udtræk fra Nordnet, som du selv importerer |
 | **FamilyLog** | Månedens forbrug og søgning, kun læsning | FamilyLog 0.5.0 med læsenøgle pr. person |
 | **Formel 1** | Sæsonens sessioner, ikke noget live | Jolpica |
 | **SLQ DL** | Late night-historie, dato for dato, og de nyeste monologer | Egen database med kilder, YouTube |

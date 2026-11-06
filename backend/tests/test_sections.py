@@ -1031,3 +1031,181 @@ def test_the_overview_never_asks_a_camera(client, monkeypatch):
     fake.calls.clear()
     assert client.get("/api/overview").json()["blocks"]["cameras"]["cameras"] == [{"id": made["id"], "name": "Indkørsel"}]
     assert not fake.calls
+
+
+# ---- Aktier ------------------------------------------------------------------------
+
+_HEADER = ["Id", "Bogføringsdag", "Handelsdag", "Valørdag", "Depot", "Transaktionstype", "Værdipapirer", "ISIN",
+           "Antal", "Kurs", "Rente", "Samlede afgifter", "Valuta", "Beløb", "Valuta", "Indkøbsværdi", "Valuta",
+           "Resultat", "Valuta", "Totalt antal", "Saldo", "Vekslingskurs", "Transaktionstekst", "Makuleringsdato",
+           "Notanummer", "Verifikationsnummer", "Kurtage", "Valuta", "Middelkurs", "Oprindelig rente"]
+
+
+def _nordnet(*rows, encoding="utf-16", delimiter="\t", currency="DKK"):
+    """A made-up file in the shape of a real export: unsigned Antal, and the amount
+    in DKK with cost and result in the security's currency.
+    Rows: id, day, kind, name, isin, antal, beløb, indkøbsværdi, resultat, totalt antal,
+    and optionally a cancelled date."""
+    lines = [delimiter.join(_HEADER)]
+    for id_, day, kind, name, isin, antal, belob, cost, resultat, total, *cancelled in rows:
+        lines.append(delimiter.join([
+            id_, day, day, day, "12345678", kind, name, isin, antal, "", "", "", "", belob, "DKK",
+            cost, currency if cost else "", resultat, currency if resultat else "", total, "", "", "",
+            cancelled[0] if cancelled else "", "", id_, "", "", "", ""]))
+    return "\n".join(lines).encode(encoding)
+
+
+_NOVO = "DK0062498333"
+_MAERSK = "DK0010244508"
+_FILE = _nordnet(
+    ("6", "2024-06-01", "INDBETALING", "", "", "", "5000", "", "", ""),
+    ("3", "2024-05-02", "SOLGT", "Novo Nordisk B", _NOVO, "5", "2500", "", "1000,5", "15"),
+    ("2", "2024-03-01", "UDBYTTE", "Novo Nordisk B", _NOVO, "20", "150,25", "", "", "0"),
+    ("7", "2024-03-01", "UDBYTTESKAT", "Novo Nordisk B", _NOVO, "20", "-40,25", "", "", "0"),
+    ("5", "2023-03-01", "SOLGT", "Maersk B", _MAERSK, "2", "21000", "", "1000", "0"),
+    ("4", "2023-02-01", "KØBT", "Maersk B", _MAERSK, "2", "-20000", "20000", "0", "2"),
+    ("1", "2023-01-10", "KØBT", "Novo Nordisk B", _NOVO, "20", "-6000", "6000", "0", "20"),
+)
+
+
+def _import(client, data=_FILE):
+    return client.post("/api/s/aktier/import", content=data, headers={"Content-Type": "text/csv"})
+
+
+@pytest.mark.parametrize("encoding,delimiter", [("utf-16", "\t"), ("utf-8-sig", ";"), ("cp1252", "\t")])
+def test_the_export_is_read_whatever_its_encoding(encoding, delimiter):
+    from app.sections.aktier import nordnet
+    data = _nordnet(("1", "2023-01-10", "KØBT", "Novo Nordisk B", _NOVO, "20,5", "-6000,5", "6000", "0", "20,5"),
+                    encoding=encoding, delimiter=delimiter)
+    rows, skipped = nordnet.parse(data)
+    assert skipped == 0 and rows[0]["kind"] == "KØBT"
+    assert (rows[0]["amount"], rows[0]["currency"], rows[0]["holding"], rows[0]["cost_currency"]) == (-6000.5, "DKK", 20.5, "DKK")
+
+
+@pytest.mark.parametrize("text,mark,value", [
+    ("1 234,50", ",", 1234.5), ("1.234,50", ",", 1234.5), ("-1 234,5", ",", -1234.5),
+    ("1,234.50", ".", 1234.5), ("12", ",", 12.0), ("", ",", None), ("x", ",", None),
+])
+def test_danish_numbers(text, mark, value):
+    from app.sections.aktier import nordnet
+    assert nordnet._number(text, mark) == value
+
+
+def test_positions_come_from_the_running_total(client):
+    assert _import(client).json() == {"added": 7, "updated": 0, "same": 0, "skipped": 0}
+    state = client.get("/api/s/aktier/state").json()
+    assert state["rows"] == 7 and (state["first"], state["last"]) == ("2023-01-10", "2024-06-01")
+    assert [(p["name"], p["quantity"], p["cost"], p["currency"]) for p in state["positions"]] == [
+        ("Novo Nordisk B", 15, 4500.0, "DKK")]
+
+
+def test_a_dividend_row_does_not_look_like_a_sale(client):
+    """On a real export Totalt antal is 0 on UDBYTTE and UDBYTTESKAT."""
+    _import(client, _nordnet(("2", "2024-03-01", "UDBYTTE", "Novo Nordisk B", _NOVO, "20", "150", "", "", "0"),
+                             ("1", "2023-01-10", "KØBT", "Novo Nordisk B", _NOVO, "20", "-6000", "6000", "0", "20")))
+    position = client.get("/api/s/aktier/state").json()["positions"][0]
+    assert (position["quantity"], position["cost"]) == (20, 6000)
+
+
+def test_buying_after_a_dividend_still_adds_up(client):
+    _import(client, _nordnet(("3", "2024-04-01", "KØBT", "Novo Nordisk B", _NOVO, "5", "-1500", "1500", "0", "25"),
+                             ("2", "2024-03-01", "UDBYTTE", "Novo Nordisk B", _NOVO, "20", "150", "", "", "0"),
+                             ("1", "2023-01-10", "KØBT", "Novo Nordisk B", _NOVO, "20", "-6000", "6000", "0", "20")))
+    position = client.get("/api/s/aktier/state").json()["positions"][0]
+    assert (position["quantity"], position["cost"]) == (25, 7500)
+
+
+def test_a_split_carries_the_cost(client):
+    _import(client, _nordnet(("3", "2024-02-01", "SPLIT INDLÆG  VP", "Novo Nordisk B", _NOVO, "40", "0", "6000", "0", "40"),
+                             ("2", "2024-02-01", "SPLIT UDTRÆK VP", "Novo Nordisk B", _NOVO, "20", "0", "", "0", "0"),
+                             ("1", "2023-01-10", "KØBT", "Novo Nordisk B", _NOVO, "20", "-6000", "6000", "0", "20")))
+    position = client.get("/api/s/aktier/state").json()["positions"][0]
+    assert (position["quantity"], position["cost"]) == (40, 6000)
+
+
+def test_cost_is_in_the_currency_of_the_security(client):
+    _import(client, _nordnet(("1", "2023-01-10", "KØBT", "Fond", "IE0000000001", "10,5", "-7500", "1000", "0", "10,5"),
+                             currency="EUR"))
+    position = client.get("/api/s/aktier/state").json()["positions"][0]
+    assert (position["quantity"], position["cost"], position["currency"]) == (10.5, 1000, "EUR")
+
+
+def test_rounded_fractions_still_add_up(client):
+    _import(client, _nordnet(("2", "2023-02-10", "KØBT", "Fond", "IE0000000001", "1,3333", "-100", "100", "0", "2,6667"),
+                             ("1", "2023-01-10", "KØBT", "Fond", "IE0000000001", "1,3333", "-100", "100", "0", "1,3333")))
+    position = client.get("/api/s/aktier/state").json()["positions"][0]
+    assert (position["quantity"], position["cost"]) == (2.6667, 200)
+
+
+def test_sold_out_and_bought_again_starts_clean(client):
+    _import(client, _nordnet(("3", "2024-02-01", "KØBT", "Novo Nordisk B", _NOVO, "5", "-1500", "1500", "0", "5"),
+                             ("2", "2024-01-01", "SOLGT", "Novo Nordisk B", _NOVO, "20", "7000", "", "100", "0"),
+                             ("1", "2023-01-10", "INDFLYTNING", "Novo Nordisk B", _NOVO, "20", "0", "", "0", "20")))
+    assert client.get("/api/s/aktier/state").json()["positions"][0]["cost"] == 1500
+
+
+def test_dividends_after_tax_and_results_per_year(client):
+    _import(client)
+    assert client.get("/api/s/aktier/state").json()["years"] == [
+        {"year": "2024", "currency": "DKK", "dividends": 110.0, "result": 1000.5},
+        {"year": "2023", "currency": "DKK", "dividends": 0.0, "result": 1000.0}]
+
+
+def test_importing_again_adds_nothing(client):
+    _import(client)
+    assert _import(client).json() == {"added": 0, "updated": 0, "same": 7, "skipped": 0}
+    longer = _nordnet(("8", "2024-07-01", "KØBT", "Novo Nordisk B", _NOVO, "5", "-1500", "1500", "0", "20"))
+    assert _import(client, longer).json()["added"] == 1
+    position = client.get("/api/s/aktier/state").json()["positions"][0]
+    assert (position["quantity"], position["cost"]) == (20, 6000)
+
+
+def test_an_export_that_starts_late_has_no_cost(client):
+    _import(client, _nordnet(("9", "2024-01-10", "KØBT", "Novo Nordisk B", _NOVO, "5", "-1500", "1500", "0", "25")))
+    position = client.get("/api/s/aktier/state").json()["positions"][0]
+    assert position["quantity"] == 25 and position["cost"] is None
+
+
+def test_shares_with_no_value_have_no_cost(client):
+    _import(client, _nordnet(("9", "2024-01-10", "INDFLYTNING", "Novo Nordisk B", _NOVO, "5", "0", "", "0", "5")))
+    assert client.get("/api/s/aktier/state").json()["positions"][0]["cost"] is None
+
+
+def test_a_cancelled_row_does_not_count(client):
+    _import(client, _nordnet(("1", "2024-01-10", "KØBT", "Novo Nordisk B", _NOVO, "5", "-1500", "1500", "0", "5"),
+                             ("2", "2024-01-11", "KØBT", "Novo Nordisk B", _NOVO, "5", "-1500", "1500", "0", "10", "2024-01-12")))
+    assert client.get("/api/s/aktier/state").json()["positions"][0]["quantity"] == 5
+
+
+def test_only_the_end_of_a_depot_number_is_kept(client):
+    from app.core import db
+    _import(client)
+    with db.connect() as con:
+        assert {r["depot"] for r in con.execute("SELECT depot FROM nordnet_rows").fetchall()} == {"5678"}
+
+
+def test_a_wrong_file_is_described_by_its_columns_only(client):
+    r = _import(client, "Dato;Tekst\n2024-01-01;hemmelig\n".encode())
+    assert r.status_code == 400 and "Totalt antal" in r.json()["detail"] and "hemmelig" not in r.json()["detail"]
+
+
+def test_a_row_without_a_date_is_counted_not_guessed(client):
+    bad = _nordnet(("1", "ukendt", "KØBT", "Novo Nordisk B", _NOVO, "5", "-1500", "1500", "0", "5"))
+    assert _import(client, bad).json() == {"added": 0, "updated": 0, "same": 0, "skipped": 1}
+
+
+def test_holdings_are_each_persons_own(client, family):
+    _import(client)
+    me = family.get("/api/auth/status").json()["user"]
+    client.patch(f"/api/admin/users/{me['id']}", json={"sections": me["sections"] + ["aktier"]})
+    assert family.get("/api/s/aktier/state").json()["positions"] == []
+    assert family.get("/api/overview").json()["blocks"]["aktier"]["positions"] == 0
+    assert client.get("/api/overview").json()["blocks"]["aktier"]["positions"] == 1
+    family.delete("/api/s/aktier/rows")
+    assert len(client.get("/api/s/aktier/state").json()["positions"]) == 1
+
+
+def test_imported_rows_can_be_removed(client):
+    _import(client)
+    client.delete("/api/s/aktier/rows")
+    assert client.get("/api/s/aktier/state").json()["rows"] == 0

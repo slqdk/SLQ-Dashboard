@@ -202,18 +202,7 @@ export function F1({ onAuthLost }: { onAuthLost: () => void }) {
   )
 }
 
-// ---- Aktier and FamilyLog: what is waiting ----------------------------------
-
-export function Aktier({ user }: { user: User }) {
-  return (
-    <main className="page narrow">
-      <SectionHead title="Aktier" text="Din Nordnet-konto." />
-      <p className="lead">Nordnet er ikke forbundet endnu.</p>
-      <p>Nordnets officielle API tager ikke imod nye kunder lige nu. Har du allerede adgang, kan det bruges direkte. Ellers er vejen at importere et udtræk og hente kurserne fra en anden kilde.</p>
-      {user.role === 'admin' && <p><a href="#/admin">Valget træffes under Admin → Opsætning</a>.</p>}
-    </main>
-  )
-}
+// ---- FamilyLog --------------------------------------------------------------
 
 interface FamilySearch {
   q: string

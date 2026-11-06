@@ -241,7 +241,14 @@ export function Overview({ user, onAuthLost }: { user: User; onAuthLost: () => v
 
         {b.aktier && (
           <Block id="aktier" title="Aktier" className="w2">
-            <p className="empty">Nordnet er ikke forbundet.</p>
+            {b.aktier.positions ? (
+              <>
+                <p className="fl-spent">{b.aktier.positions}</p>
+                <p className="note">værdipapirer{b.aktier.importedAt ? `, importeret for ${ago(b.aktier.importedAt, now.getTime())} siden` : ''}</p>
+              </>
+            ) : (
+              <p className="empty">{b.aktier.mode === 'csv' ? 'Intet importeret endnu.' : 'Nordnet er ikke forbundet.'}</p>
+            )}
           </Block>
         )}
 

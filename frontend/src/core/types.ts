@@ -216,7 +216,7 @@ export interface Overview {
     dklive?: DkLive
     news?: { items: NewsItem[]; feeds: NewsFeedState[] }
     logmylife?: { onThisDay: LifeEvent[]; latest: LifeEvent[]; total: number }
-    aktier?: { mode: string; positions: unknown[] }
+    aktier?: { mode: string; positions: number; importedAt: string | null }
     familylog?: FamilyLogState
     f1?: F1Block
     latenight?: LateNightBlock

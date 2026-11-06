@@ -367,7 +367,7 @@ function SetupPage({ onAuthLost }: { onAuthLost: () => void }) {
       'dkliveUrl', 'dkliveLink', 'familylogUrl', 'go2rtcUrl', 'nordnetMode']
     const body: Record<string, unknown> = {}
     for (const key of keys) if (!pins[key]) body[key] = form[key]
-    for (const key of ['googleClientSecret', 'nordnetApiKey', 'youtubeApiKey']) {
+    for (const key of ['googleClientSecret', 'youtubeApiKey']) {
       if (form[key] && !pins[key]) body[key] = form[key]
     }
     body.newsFeeds = feeds.filter((f) => f.url.trim())
@@ -467,12 +467,10 @@ function SetupPage({ onAuthLost }: { onAuthLost: () => void }) {
         <label>Forbindelse
           <select value={String(form.nordnetMode ?? 'off')} onChange={(e) => change('nordnetMode', e.target.value)}>
             <option value="off">Ikke forbundet</option>
-            <option value="api">Officielt API</option>
             <option value="csv">Importeret udtræk</option>
           </select>
         </label>
-        <Secret label="API-nøgle" name="nordnetApiKey" setup={data} value={String(form.nordnetApiKey ?? '')} onChange={change} />
-        <p className="note">Nordnets API tager ikke imod nye kunder lige nu, og en nøgle giver fuld handelsadgang. Forbindelsen er ikke bygget endnu.</p>
+        <p className="note">Hver person importerer sin egen CSV-fil fra Nordnet på siden Aktier. Nordnets API tager ikke imod nye kunder, så dashboardet bruger det ikke.</p>
       </fieldset>
 
       <div className="setup-actions">

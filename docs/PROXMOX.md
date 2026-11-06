@@ -97,7 +97,14 @@ Den har ingen åben port, så alt går gennem dashboardets login. Den gemmer ikk
 kameraernes login på disken: dashboardet sender det igen, hvis den genstarter.
 Det er afprøvet med go2rtc og en testkilde, men ikke på et rigtigt C200 endnu.
 
-## 8. Opdatering og backup
+## 8. Aktier
+
+Vælg **Importeret udtræk** under **Admin → Opsætning → Nordnet**. Hent så CSV-filen
+fra Transaktioner og notaer på Nordnet med hele perioden valgt, og importér den på
+siden **Aktier**. Hver person ser kun sit eget, og sektionen er slået fra for
+familien som standard. Importér igen, når der er nyt: kun det nye kommer til.
+
+## 9. Opdatering og backup
 
 ```bash
 cd /opt/slq-dashboard

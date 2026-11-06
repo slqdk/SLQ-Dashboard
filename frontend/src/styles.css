@@ -371,6 +371,13 @@ summary { cursor: pointer; }
 details ol { list-style: decimal; padding-left: 18px; margin: 6px 0; }
 .copy { display: block; padding: 6px 8px; background: var(--screen); border-radius: 4px; overflow-wrap: anywhere; color: var(--paper); user-select: all; }
 
+.holdings { width: 100%; border-collapse: collapse; margin-top: 4px; }
+.holdings th, .holdings td { padding: 7px 0 7px 18px; border-top: 1px solid var(--rule); text-align: right; white-space: nowrap; }
+.holdings thead th { border-top: 0; color: var(--mute); font-size: 14px; font-weight: 500; }
+.holdings th:first-child { padding-left: 0; text-align: left; white-space: normal; }
+.holdings tbody th { font-weight: 600; }
+.aktier-foot { margin-top: 18px; }
+
 /* ---- Printere and Kameraer ---- */
 .printers { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; }
 .printer { padding: 14px 18px 16px; background: var(--panel); border-radius: 6px; }

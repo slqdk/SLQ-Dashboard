@@ -33,6 +33,9 @@ Proxmox LXC. **Read `docs/PLAN.md` first: decisions, what is built, what is open
   so the page always answers at once.
 - **No secrets to the browser or the log.** Settings secrets go through
   `settings.public()`; per-person tokens through `core/vault.py`.
+- **Nordnet rows are a person's own.** Nothing from them reaches a log or an error
+  text, only the last four digits of a depot number are kept, and real exports stay
+  out of the repo and its tests.
 - **No ads, images or trackers from news feeds.** Plain text only, paid items dropped.
 - Every SLQ DL fact in `seed.json` has a source. Don't add one from memory.
 - Migrations only add; never renumber one that has run.

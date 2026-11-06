@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { ago, dayKey, dayName, duration, kr, localDate, until } from './format'
+import { ago, dayKey, dayName, duration, kr, localDate, units, until } from './format'
 
 const now = new Date(2026, 10, 6, 7, 15) // Friday 6 November
+
+describe('units', () => {
+  it('keeps fractions and drops empty decimals', () => {
+    expect(units(15)).toBe('15')
+    expect(units(2.6667)).toBe('2,6667')
+  })
+})
 
 describe('dayName', () => {
   it('names the near days', () => {

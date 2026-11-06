@@ -62,6 +62,7 @@ await page.waitForSelector('legend:has-text("Nyheder")')
 const urls = page.locator('.form-row.feed input').nth(1)
 await urls.fill(`${MOCK}/rss/DR`)
 await page.locator('.form-row.feed input').nth(3).fill(`${MOCK}/rss/TV2`)
+await page.locator('fieldset:has(legend:has-text("Nordnet")) select').selectOption('csv')
 await page.click('button:has-text("Gem opsætning")')
 await page.waitForSelector('text=Gemt.')
 check(true, 'setup saved')
@@ -208,7 +209,23 @@ check(await page.locator('dialog .cam-frame img').count() === 1, 'no live video 
 await page.click('dialog button:has-text("Luk")')
 
 await go('aktier')
-await page.waitForSelector('text=ikke forbundet')
+await page.click('button:has-text("Importér fra Nordnet")')
+await page.setInputFiles('dialog input[type="file"]', {
+  name: 'transactions-and-notes-export.csv',
+  mimeType: 'text/csv',
+  // UTF-16 with a BOM, tabs and decimal commas, as the real export. Made-up rows.
+  buffer: Buffer.from('\ufeff' + [
+    ['Id', 'Bogføringsdag', 'Handelsdag', 'Depot', 'Transaktionstype', 'Værdipapirer', 'ISIN', 'Antal', 'Beløb', 'Valuta', 'Indkøbsværdi', 'Valuta', 'Resultat', 'Valuta', 'Totalt antal', 'Makuleringsdato'],
+    ['3', '2024-03-01', '2024-03-01', '12345678', 'UDBYTTE', 'Eksempel A/S', 'DK0000000001', '20', '150,25', 'DKK', '', '', '', '', '0', ''],
+    ['2', '2023-02-10', '2023-02-10', '12345678', 'KØBT', 'Eksempel Fond', 'IE0000000001', '2,5', '-750', 'DKK', '100', 'EUR', '0', 'EUR', '2,5', ''],
+    ['1', '2023-01-10', '2023-01-10', '12345678', 'KØBT', 'Eksempel A/S', 'DK0000000001', '20', '-6000', 'DKK', '6000', 'DKK', '0', 'DKK', '20', ''],
+  ].map((row) => row.join('\t')).join('\n'), 'utf16le'),
+})
+await page.waitForSelector('dialog .lead:has-text("3 nye")')
+await page.click('dialog button:has-text("Luk")')
+await page.waitForSelector('.holdings tbody tr:has-text("Eksempel A/S")')
+check((await page.textContent('.holdings tbody tr:has-text("Eksempel A/S")')).includes('6.000,00 DKK'), 'a dividend does not read as a sale')
+check((await page.textContent('.holdings tbody tr:has-text("Eksempel Fond")')).includes('2,5'), 'fractions of a fund')
 await shot('aktier')
 await go('familylog')
 await shot('familylog')
@@ -217,6 +234,7 @@ await shot('familylog')
 await go('')
 await page.waitForSelector('.band svg')
 await page.waitForSelector('.block:has-text("Nyheder") .headlines li')
+check((await page.textContent('.block:has-text("Aktier")')).includes('værdipapirer'), 'the holdings on the overview')
 for (const title of ['Kalender', 'DK live', 'Nyheder', 'SLQ DL', 'Formel 1', 'LogMyLife', 'Links', 'Aktier', 'FamilyLog', 'Printere', 'Kameraer']) {
   check(await page.locator(`.block h2:has-text("${title}")`).count() === 1, `overview has ${title}`)
 }

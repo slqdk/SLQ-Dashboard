@@ -1,38 +1,20 @@
-"""Aktier: the Nordnet account. Admin only by default.
+"""Aktier: each person's Nordnet holdings, from an export they upload.
 
-Not connected yet. Nordnet's official API is closed to new customers, so the
-way in is still to be chosen (see docs/PLAN.md)."""
+Nordnet's API is closed to new customers, so the way in is the transactions file
+from Nordnet's own site. Off for family accounts unless the admin says so, and a
+person only ever sees their own rows."""
 from __future__ import annotations
 
-from fastapi import APIRouter
-
-from ...core import settings
 from ...core.sections import Section
-
-router = APIRouter(prefix="/api/s/aktier", tags=["aktier"])
-
-
-def state(_me: dict | None = None) -> dict:
-    return {"mode": settings.load().get("nordnetMode") or "off", "positions": []}
-
-
-@router.get("/state")
-def get_state():
-    return state()
-
-
-def setup_status() -> dict:
-    mode = settings.load().get("nordnetMode")
-    if mode == "off":
-        return {"ok": False, "text": "Ikke forbundet."}
-    return {"ok": False, "text": f"{mode}: ikke bygget endnu."}
-
+from . import store
+from .routes import router
 
 SECTION = Section(
     id="aktier",
     title="Aktier",
     router=router,
+    migrations=[(1, "nordnet_rows", store.migrate_1)],
     family_default=False,
-    overview=state,
-    setup=setup_status,
+    overview=store.overview,
+    setup=store.setup_status,
 )
